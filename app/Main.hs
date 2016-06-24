@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import Control.Concurrent (threadDelay)
-import Control.Exception (bracket_)
+import Control.Exception (bracket_, evaluate)
 import Control.Monad (forM_, guard)
 import Control.Lens
 import qualified Data.Set as S
@@ -33,27 +33,30 @@ train :: Sprite8
 train = sprite8 [ 0x00, 0x70, 0x77, 0x52, 0x5E, 0x7F, 0x55, 0x22 ]
 
 blitLoop :: Window -> Int -> IO ()
-blitLoop window = go
+blitLoop window t = do
+    buffer <- makeBuffer
+    go buffer t
   where
-    go !t = do
+    go buf !t = do
         print ("Loop", t)
         events <- pollEvents
-        threadDelay 10 -- 16000
-        blitThing window t
-        go (t+1)
+        threadDelay 30001
+        blitThing window buf t
+        if t < 100 then go buf (t+1) else return ()
 
-blitThing :: Window -> Int -> IO ()
-blitThing w t = do
+makeBuffer :: IO Surface
+makeBuffer = createRGBSurface (fmap fromIntegral logicalScreenSizeWH) 24 mask
+  where
+    mask = V4 0xFF0000 0x00FF00 0x0000FF 0x000000
+
+blitThing :: Window -> Surface -> Int -> IO ()
+blitThing w buffer t = do
     let screen = foldr (drawSprite train) emptyBits [xy (10+t) 10, xy 40 10]
         colors = defaultColors (ColorBlock (Color 3) (Color 7) BrightI)
     winSurf <- getWindowSurface w
-    let (V2 width _) = logicalScreenSizeWH
-    buffer <- createRGBSurface (fmap fromIntegral logicalScreenSizeWH) 24 mask
     bracket_ (lockSurface buffer) (unlockSurface buffer) $ do
         bufPtr <- surfacePixels buffer
-        writeToPtr bufPtr (screenToBytes screen colors)
+        screenToBytes3 screen colors (F.castPtr bufPtr)
         return ()
     surfaceBlit buffer Nothing winSurf Nothing
     updateWindowSurface w
-  where
-    mask = V4 0xFF0000 0x00FF00 0x0000FF 0x000000

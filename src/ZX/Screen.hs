@@ -1,21 +1,28 @@
+{-# LANGUAGE BangPatterns  #-}
 {-# LANGUAGE FlexibleContexts #-}
 module ZX.Screen where
 
+import Control.DeepSeq
+import Control.Lens ((^.))
+import Control.Monad.ST (runST)
 import Data.Array.Repa ((:.)(..), Z(Z))
 import qualified Data.Array.Repa as R
 import Data.Bits (testBit, xor)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as B
 import qualified Data.Map.Strict as M
-import Control.Lens ((^.))
 import qualified Data.Set as S
+import qualified Data.Vector as BV
 import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Storable as SV
+import qualified Data.Vector.Storable.Mutable as SMV
+import qualified Data.Vector.Unboxed as UV
+import qualified Data.Vector.Unboxed.Mutable as UMV
 import Data.Word (Word8)
 import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Storable (pokeElemOff)
 import Foreign.Ptr (Ptr, castPtr)
-import Linear (R2, V2(..), V3(..), _x, _y, _yx)
+import Linear (R2, V2(..), V3(..), _x, _y, _yx, _z)
 import Linear.Affine (Point(P))
 import Linear.Vector ((^*), (^/), (^+^))
 
@@ -28,17 +35,32 @@ instance (R2 r2, Ord t) => Ord (RowMajor r2 t) where
 -}
 
 logicalScreenSizeWH :: V2 Int
-logicalScreenSizeWH = V2 256 192
+logicalScreenSizeWH = V2 logicalScreenW logicalScreenH
+
+logicalScreenW :: Int
+logicalScreenW = 256
+{-# INLINE logicalScreenW #-}
+
+logicalScreenH :: Int
+logicalScreenH = 192
+{-# INLINE logicalScreenH #-}
+
+logicalScreenArea :: Int
+logicalScreenArea = logicalScreenSizeWH^._x * logicalScreenSizeWH^._y
 
 blockSize :: Int
 blockSize = 8
+{-# INLINE blockSize #-}
+
+blockSizeSqr :: Int
+blockSizeSqr = 64
+{-# INLINE blockSizeSqr #-}
 
 screenBlocksWH :: V2 Int
 screenBlocksWH = fmap (`div` blockSize) logicalScreenSizeWH
 
 xy :: (Num a) => a -> a -> Point V2 a
 xy x y = P (V2 x y)
-{-# INLINE xy #-}
 
 newtype Sprite8 = Sprite8 { sprite8Bytes :: SV.Vector Word8 }
 sprite8 = Sprite8 . V.fromList
@@ -67,9 +89,12 @@ drawSprite sprite pos =
 -- * Color attribute block routines
 
 data Intensity = NormalI | BrightI
+instance NFData Intensity where rnf a = a `seq` ()
+
 newtype Color = Color { colorIndex :: Int }
 
 data ColorBlock = ColorBlock !Color !Color !Intensity
+instance NFData ColorBlock where rnf a = a `seq` ()
 
 type BlockIndex = Point V2 Int
 
@@ -89,8 +114,11 @@ setBlockColor cb pos screenColors = screenColors
 
 type RGB = V3 Word8
 
-pixelRangeForBlock :: Int -> [Int]
-pixelRangeForBlock b = [b*blockSize .. (b+1)*blockSize - 1]
+-- | End of range excluded.
+pixelRangeForBlock :: Int -> (Int, Int)
+pixelRangeForBlock b = (b*blockSize, (b+1)*blockSize)
+
+pixelList b = let (s,e) = pixelRangeForBlock b in [s .. e-1]
 
 writeToPtr = unsafeWriteToPtr
 
@@ -107,19 +135,31 @@ unsafeWriteToPtr :: Ptr a -> B.ByteString -> IO ()
 unsafeWriteToPtr p bs = B.unsafeUseAsCStringLen bs $ \(bp, len) ->
     copyBytes (castPtr p) bp len
 
-screenToBytes :: ScreenBits -> ScreenColors -> B.ByteString
-screenToBytes bits colors = B.pack $ do
-    cy <- [0..screenBlocksWH^._y - 1]
-    y <- pixelRangeForBlock cy
-    cx <- [0..screenBlocksWH^._x - 1]
-    let colorBlock = fetchColorBlock (xy cx cy)
-        fg = rgbToList (foreground colorBlock)
-        bg = rgbToList (background colorBlock)
-    x <- pixelRangeForBlock cx
-    if S.member (xy x y) bits
-    then fg
-    else bg
+screenToBytes :: ScreenBits -> ScreenColors -> Ptr Word8 -> IO ()
+screenToBytes bits colors ptr = go 0 0
   where
+    go :: Int -> Int -> IO ()
+    go !x !y = do
+        let !cx = x `div` blockSize
+            !cy = y `div` blockSize
+            !colorBlock = fetchColorBlock (xy cx cy)
+            !fg = foreground colorBlock
+            !bg = background colorBlock
+            !offs = 3*(y*logicalScreenW + x)
+            !col = {-# SCC "pixMember" #-}
+                if S.member (xy x y) bits then fg else bg
+            -- !col = cR
+        pokeElemOff ptr (offs) (col^._z)
+        pokeElemOff ptr (offs+1) (col^._y)
+        pokeElemOff ptr (offs+2) (col^._x)
+        let !xp = x + 1
+            !newline = xp == logicalScreenW
+            !y2 = if newline then y+1 else y
+            !x2 = if newline then 0 else xp
+        if y2 == logicalScreenH
+            then return ()
+            else go x2 y2
+    --
     fetchColorBlock :: BlockIndex -> ColorBlock
     fetchColorBlock bi = case M.lookup bi (colorOverrides colors) of
         Just cb -> cb
@@ -127,8 +167,105 @@ screenToBytes bits colors = B.pack $ do
     foreground, background :: ColorBlock -> RGB
     foreground (ColorBlock c _ i) = colorToRGB c i
     background (ColorBlock _ c i) = colorToRGB c i
-    rgbToList :: RGB -> [Word8]
-    rgbToList (V3 r g b) = [b, g, r]  -- little endian memory layout
+
+screenToBytes2 :: ScreenBits -> ScreenColors -> Ptr Word8 -> IO ()
+screenToBytes2 bits colors ptr = go 0 0
+  where
+    go :: Int -> Int -> IO ()
+    go !x !y = do
+        let cx = x `div` blockSize
+            cy = y `div` blockSize
+            colorBlock = fetchColorBlock (xy cx cy)
+            fg = foreground colorBlock
+            bg = background colorBlock
+            offs = 3*(y*logicalScreenW + x)
+            col = {-# SCC "pixMember" #-}
+                if S.member (xy x y) bits then fg else bg
+        pokeElemOff ptr (offs) (col^._z)
+        pokeElemOff ptr (offs+1) (col^._y)
+        pokeElemOff ptr (offs+2) (col^._x)
+        let xp = x + 1
+            newline = xp == logicalScreenW
+            y2 = if newline then y+1 else y
+            x2 = if newline then 0 else xp
+        if y2 == logicalScreenH
+            then return ()
+            else go x2 y2
+    --
+    fetchColorBlock :: BlockIndex -> ColorBlock
+    fetchColorBlock bi = case M.lookup bi (colorOverrides colors) of
+        Just cb -> cb
+        Nothing -> defaultColor colors
+    foreground, background :: ColorBlock -> RGB
+    foreground (ColorBlock c _ i) = colorToRGB c i
+    background (ColorBlock _ c i) = colorToRGB c i
+
+data ColorFB = ColorFB !RGB !RGB
+
+precalcColor :: ScreenColors -> BV.Vector ColorFB
+precalcColor colors = V.fromList $ do
+    cy <- [0..screenBlocksWH^._y]
+    cx <- [0..screenBlocksWH^._x]
+    let cb = fetchColorBlock (xy cx cy)
+    return $! ColorFB (foreground cb) (background cb)
+  where
+    fetchColorBlock :: BlockIndex -> ColorBlock
+    fetchColorBlock bi = case M.lookup bi (colorOverrides colors) of
+        Just cb -> cb
+        Nothing -> defaultColor colors
+    --
+    foreground, background :: ColorBlock -> RGB
+    foreground (ColorBlock c _ i) = colorToRGB c i
+    background (ColorBlock _ c i) = colorToRGB c i
+
+precalcBits :: ScreenBits -> SV.Vector Bool
+precalcBits bits = runST $ do
+    v <- SMV.replicate logicalScreenArea False
+    mapM_ (\p -> SMV.write v (p^._y*logicalScreenW + p^._x) True) (S.toList bits)
+    SV.freeze v
+
+screenToBytes3 :: ScreenBits -> ScreenColors -> Ptr Word8 -> IO ()
+screenToBytes3 bits colors ptr = go 0
+  where
+    go :: Int -> IO ()
+    go !idx = if idx == logicalScreenArea then return () else do
+        let y = idx `div` logicalScreenW
+            x = idx `mod` logicalScreenW
+            cx = x `div` blockSize
+            iy = idx `div` blockSizeSqr
+            (ColorFB fg bg) = colVec V.! (iy + cx)
+            offs = 3*idx
+            col = {-# SCC "pixMember" #-}
+                if bitVec V.! idx then fg else bg
+        pokeElemOff ptr (offs) (col^._z)
+        pokeElemOff ptr (offs+1) (col^._y)
+        pokeElemOff ptr (offs+2) (col^._x)
+        go $! idx+1
+    --
+    colVec = precalcColor colors
+    bitVec = precalcBits bits
+
+screenToBytes4 :: ScreenBits -> ScreenColors -> Ptr Word8 -> IO ()
+screenToBytes4 bits colors ptr = go 0
+  where
+    go :: Int -> IO ()
+    go !idx = if idx == logicalScreenArea then return () else do
+        let y = idx `div` logicalScreenW
+            x = idx `mod` logicalScreenW
+            cx = x `div` blockSize
+            iy = idx `div` blockSizeSqr
+            (ColorFB fg bg) = colVec V.! (iy + cx)
+            offs = 3*idx
+            col = {-# SCC "pixMember" #-}
+                if bitVec V.! idx then fg else bg
+        pokeElemOff ptr (offs) (col^._z)
+        pokeElemOff ptr (offs+1) (col^._y)
+        pokeElemOff ptr (offs+2) (col^._x)
+        go $! idx+1
+    --
+    colVec = precalcColor colors
+    bitVec = precalcBits bits
+
 
 {-
 -- TODO switch to B array, gen ByteArray, directly poke?
@@ -151,12 +288,12 @@ cB = V3 0 0 1
 colorToRGB :: Color -> Intensity -> RGB
 colorToRGB (Color i) bright =
     let cols = [black, blue, red, magenta, green, cyan, yellow, white]
-        brightVals = map (^* brightMultiplier BrightI) cols
-        normalVals = map (^* brightMultiplier NormalI) cols
+        brightVals = SV.fromList $ map (^* brightMultiplier BrightI) cols
+        normalVals = SV.fromList $ map (^* brightMultiplier NormalI) cols
         vals = case bright of
             NormalI -> normalVals
             BrightI -> brightVals
-    in vals !! (i `mod` length vals)
+    in vals V.! (i `mod` V.length vals)
   where
     brightMultiplier BrightI = 255
     brightMultiplier NormalI = 205
