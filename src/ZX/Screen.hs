@@ -4,12 +4,17 @@ module ZX.Screen where
 import Data.Array.Repa ((:.)(..), Z(Z))
 import qualified Data.Array.Repa as R
 import Data.Bits (testBit, xor)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Unsafe as B
 import qualified Data.Map.Strict as M
 import Control.Lens ((^.))
 import qualified Data.Set as S
 import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Storable as SV
 import Data.Word (Word8)
+import Foreign.Marshal.Utils (copyBytes)
+import Foreign.Storable (pokeElemOff)
+import Foreign.Ptr (Ptr, castPtr)
 import Linear (R2, V2(..), V3(..), _x, _y, _yx)
 import Linear.Affine (Point(P))
 import Linear.Vector ((^*), (^/), (^+^))
@@ -28,8 +33,12 @@ logicalScreenSizeWH = V2 256 192
 blockSize :: Int
 blockSize = 8
 
+screenBlocksWH :: V2 Int
+screenBlocksWH = fmap (`div` blockSize) logicalScreenSizeWH
+
 xy :: (Num a) => a -> a -> Point V2 a
 xy x y = P (V2 x y)
+{-# INLINE xy #-}
 
 newtype Sprite8 = Sprite8 { sprite8Bytes :: SV.Vector Word8 }
 sprite8 = Sprite8 . V.fromList
@@ -80,24 +89,48 @@ setBlockColor cb pos screenColors = screenColors
 
 type RGB = V3 Word8
 
-screenToArray :: ScreenBits -> ScreenColors -> R.Array R.D R.DIM2 RGB
-screenToArray bits colors = R.fromFunction
-    (Z :. logicalScreenSizeWH^._y :. logicalScreenSizeWH^._x)
-    (\(Z :. y :. x) ->
-        let pos = xy x y
-            block = fmap (`div` blockSize) pos
-        in if S.member pos bits
-           then fetch block foreground
-           else fetch block background)
+pixelRangeForBlock :: Int -> [Int]
+pixelRangeForBlock b = [b*blockSize .. (b+1)*blockSize - 1]
+
+writeToPtr = unsafeWriteToPtr
+
+writeToPtrTest2 p _ = unsafeWriteToPtr p (B.pack [0, 255, 0])
+
+writeToPtrTest p _ =
+    let pw = castPtr p :: Ptr Word8
+    in do
+        pokeElemOff pw 0 255
+        pokeElemOff pw 1 255
+        pokeElemOff pw 2 10
+
+unsafeWriteToPtr :: Ptr a -> B.ByteString -> IO ()
+unsafeWriteToPtr p bs = B.unsafeUseAsCStringLen bs $ \(bp, len) ->
+    copyBytes (castPtr p) bp len
+
+screenToBytes :: ScreenBits -> ScreenColors -> B.ByteString
+screenToBytes bits colors = B.pack $ do
+    cy <- [0..screenBlocksWH^._y - 1]
+    y <- pixelRangeForBlock cy
+    cx <- [0..screenBlocksWH^._x - 1]
+    let colorBlock = fetchColorBlock (xy cx cy)
+        fg = rgbToList (foreground colorBlock)
+        bg = rgbToList (background colorBlock)
+    x <- pixelRangeForBlock cx
+    if S.member (xy x y) bits
+    then fg
+    else bg
   where
-    fetch :: BlockIndex -> (ColorBlock -> RGB) -> RGB
-    fetch bi f = case M.lookup bi (colorOverrides colors) of
-        Just cb -> f cb
-        Nothing -> f (defaultColor colors)
+    fetchColorBlock :: BlockIndex -> ColorBlock
+    fetchColorBlock bi = case M.lookup bi (colorOverrides colors) of
+        Just cb -> cb
+        Nothing -> defaultColor colors
     foreground, background :: ColorBlock -> RGB
     foreground (ColorBlock c _ i) = colorToRGB c i
     background (ColorBlock _ c i) = colorToRGB c i
+    rgbToList :: RGB -> [Word8]
+    rgbToList (V3 r g b) = [b, g, r]  -- little endian memory layout
 
+{-
 -- TODO switch to B array, gen ByteArray, directly poke?
 arrayToVector :: (V.Vector v Word8) => R.Array R.D R.DIM2 RGB -> (V2 Int, v Word8)
 arrayToVector a =
@@ -108,6 +141,7 @@ arrayToVector a =
     in ((V2 w h), vec)
   where
     mem (V3 r g b) = [b, g, r]  -- for little-endian.
+-}
 
 cR, cG, cB :: RGB
 cR = V3 1 0 0

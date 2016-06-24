@@ -1,13 +1,13 @@
 name:                test
 version:             0.1.0.0
-synopsis:            Initial project template from stack
+synopsis:            Test ZX Spectrum-like graphics.
 description:         Please see README.md
 homepage:            https://github.com/githubuser/test#readme
 license:             BSD3
 license-file:        LICENSE
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2016 Author name here
+author:              Robin Palotai
+maintainer:          palotai.robin@gmail.com
+copyright:           2016 Robin Palotai
 category:            Web
 build-type:          Simple
 -- extra-source-files:
@@ -17,7 +17,9 @@ library
   hs-source-dirs:      src
   exposed-modules:     Lib
                        ZX.Screen
+  ghc-options:         -O2
   build-depends:       base >= 4.7 && < 5
+                     , bytestring
                      , containers
                      , lens
                      , linear
@@ -28,7 +30,7 @@ library
 executable test-exe
   hs-source-dirs:      app
   main-is:             Main.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:         -threaded -rtsopts -O2
   build-depends:       base
                      , test, sdl2, linear, vector, lens, containers
                      , conduit, conduit-extra, conduit-combinators, conduit-audio

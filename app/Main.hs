@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import Control.Concurrent (threadDelay)
-import Control.Exception (bracket)
+import Control.Exception (bracket_)
 import Control.Monad (forM_, guard)
 import Control.Lens
 import qualified Data.Set as S
@@ -46,13 +46,14 @@ blitThing :: Window -> Int -> IO ()
 blitThing w t = do
     let screen = foldr (drawSprite train) emptyBits [xy (10+t) 10, xy 40 10]
         colors = defaultColors (ColorBlock (Color 3) (Color 7) BrightI)
-        vec :: SV.Vector Word8
-        (dim@(V2 width _), vec) = arrayToVector (screenToArray screen colors)
     winSurf <- getWindowSurface w
-    pixels <- V.thaw vec
-    tmp <- createRGBSurfaceFrom pixels
-               (fmap fromIntegral dim) 24 (fromIntegral width*3) mask
-    surfaceBlit tmp Nothing winSurf Nothing
+    let (V2 width _) = logicalScreenSizeWH
+    buffer <- createRGBSurface (fmap fromIntegral logicalScreenSizeWH) 24 mask
+    bracket_ (lockSurface buffer) (unlockSurface buffer) $ do
+        bufPtr <- surfacePixels buffer
+        writeToPtr bufPtr (screenToBytes screen colors)
+        return ()
+    surfaceBlit buffer Nothing winSurf Nothing
     updateWindowSurface w
   where
     mask = V4 0xFF0000 0x00FF00 0x0000FF 0x000000
