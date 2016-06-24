@@ -151,7 +151,11 @@ cB = V3 0 0 1
 colorToRGB :: Color -> Intensity -> RGB
 colorToRGB (Color i) bright =
     let cols = [black, blue, red, magenta, green, cyan, yellow, white]
-        vals = map (^* brightMultiplier bright) cols
+        brightVals = map (^* brightMultiplier BrightI) cols
+        normalVals = map (^* brightMultiplier NormalI) cols
+        vals = case bright of
+            NormalI -> normalVals
+            BrightI -> brightVals
     in vals !! (i `mod` length vals)
   where
     brightMultiplier BrightI = 255

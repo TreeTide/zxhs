@@ -1,0 +1,181 @@
+	Fri Jun 24 17:02 2016 Time and Allocation Profiling Report  (Final)
+
+	   test-exe +RTS -p -s -RTS
+
+	total time  =        2.57 secs   (2566 ticks @ 1000 us, 1 processor)
+	total alloc = 3,384,517,464 bytes  (excludes profiling overheads)
+
+COST CENTRE        MODULE    %time %alloc
+
+screenToBytes      ZX.Screen  84.1   71.4
+pixelRangeForBlock ZX.Screen   7.9   25.6
+colorToRGB         ZX.Screen   3.5    0.0
+screenToBytes.bg   ZX.Screen   0.9    2.8
+
+
+                                                                               individual     inherited
+COST CENTRE                          MODULE                  no.     entries  %time %alloc   %time %alloc
+
+MAIN                                 MAIN                    282           0    0.3    0.0   100.0  100.0
+ main                                Main                    565           0    0.0    0.0    99.7  100.0
+  blitLoop                           Main                    572           1    0.0    0.0    99.7  100.0
+   blitLoop.go                       Main                    573         215    0.5    0.0    99.7  100.0
+    blitThing                        Main                    580         215    0.4    0.0    99.1  100.0
+     blitThing.screen                Main                    606         215    0.0    0.0     0.4    0.1
+      drawSprite                     ZX.Screen               607         215    0.1    0.0     0.4    0.1
+       drawSprite.spriteBits         ZX.Screen               617         215    0.2    0.1     0.2    0.1
+       drawSprite.cpos               ZX.Screen               616         215    0.0    0.0     0.0    0.0
+       drawSprite.points             ZX.Screen               608         215    0.0    0.0     0.0    0.0
+        sprite8Points                ZX.Screen               609         215    0.0    0.0     0.0    0.0
+         sprite8Points.value         ZX.Screen               615       13760    0.0    0.0     0.0    0.0
+     screenToBytes                   ZX.Screen               596         215   84.1   71.4    98.2   99.8
+      screenToBytes.fg               ZX.Screen               666        3835    0.0    0.0     0.0    0.0
+       screenToBytes.rgbToList       ZX.Screen               673        3835    0.0    0.0     0.0    0.0
+       screenToBytes.foreground      ZX.Screen               667        3835    0.0    0.0     0.0    0.0
+        colorToRGB                   ZX.Screen               668        3835    0.0    0.0     0.0    0.0
+         colorToRGB.vals             ZX.Screen               669        3835    0.0    0.0     0.0    0.0
+      screenToBytes.colorBlock       ZX.Screen               638     1316809    0.9    0.0     1.1    0.0
+       screenToBytes.fetchColorBlock ZX.Screen               639     1316809    0.2    0.0     0.2    0.0
+        defaultColor                 ZX.Screen               647         215    0.0    0.0     0.0    0.0
+        colorOverrides               ZX.Screen               640         215    0.0    0.0     0.0    0.0
+      screenToBytes.bg               ZX.Screen               636     1316798    0.9    2.8     5.1    2.8
+       screenToBytes.rgbToList       ZX.Screen               665     1316798    0.0    0.0     0.0    0.0
+       screenToBytes.background      ZX.Screen               637     1316798    0.6    0.0     4.2    0.0
+        colorToRGB                   ZX.Screen               648     1316798    3.5    0.0     3.6    0.0
+         colorToRGB.vals             ZX.Screen               649     1316798    0.1    0.0     0.1    0.0
+      pixelRangeForBlock             ZX.Screen               602     1321953    7.9   25.6     7.9   25.6
+     unsafeWriteToPtr                ZX.Screen               595         215    0.1    0.0     0.3    0.0
+      unsafeWriteToPtr.\             ZX.Screen               674         214    0.2    0.0     0.2    0.0
+ CAF:main1                           Main                    562           0    0.0    0.0     0.0    0.0
+  main                               Main                    564           1    0.0    0.0     0.0    0.0
+ CAF:lvl27_rqQ2                      Main                    561           0    0.0    0.0     0.0    0.0
+  main                               Main                    581           0    0.0    0.0     0.0    0.0
+   blitLoop                          Main                    582           0    0.0    0.0     0.0    0.0
+    blitLoop.go                      Main                    583           0    0.0    0.0     0.0    0.0
+     blitThing                       Main                    584           0    0.0    0.0     0.0    0.0
+ CAF:lvl26_rqQ0                      Main                    560           0    0.0    0.0     0.0    0.0
+  main                               Main                    585           0    0.0    0.0     0.0    0.0
+   blitLoop                          Main                    586           0    0.0    0.0     0.0    0.0
+    blitLoop.go                      Main                    587           0    0.0    0.0     0.0    0.0
+     blitThing                       Main                    588           0    0.0    0.0     0.0    0.0
+ CAF:lvl25_rqPZ                      Main                    559           0    0.0    0.0     0.0    0.0
+  main                               Main                    618           0    0.0    0.0     0.0    0.0
+   blitLoop                          Main                    619           0    0.0    0.0     0.0    0.0
+    blitLoop.go                      Main                    620           0    0.0    0.0     0.0    0.0
+     blitThing                       Main                    621           0    0.0    0.0     0.0    0.0
+      blitThing.screen               Main                    622           0    0.0    0.0     0.0    0.0
+       drawSprite                    ZX.Screen               629           0    0.0    0.0     0.0    0.0
+ CAF:lvl24_rqPY                      Main                    558           0    0.0    0.0     0.0    0.0
+  main                               Main                    623           0    0.0    0.0     0.0    0.0
+   blitLoop                          Main                    624           0    0.0    0.0     0.0    0.0
+    blitLoop.go                      Main                    625           0    0.0    0.0     0.0    0.0
+     blitThing                       Main                    626           0    0.0    0.0     0.0    0.0
+      blitThing.screen               Main                    627           0    0.0    0.0     0.0    0.0
+       drawSprite                    ZX.Screen               628           1    0.0    0.0     0.0    0.0
+        drawSprite.spriteBits        ZX.Screen               634           1    0.0    0.0     0.0    0.0
+        drawSprite.cpos              ZX.Screen               633           1    0.0    0.0     0.0    0.0
+        drawSprite.points            ZX.Screen               630           1    0.0    0.0     0.0    0.0
+         sprite8Points               ZX.Screen               631           1    0.0    0.0     0.0    0.0
+          sprite8Points.value        ZX.Screen               632          64    0.0    0.0     0.0    0.0
+ CAF:colors_rqPV                     Main                    557           0    0.0    0.0     0.0    0.0
+  main                               Main                    641           0    0.0    0.0     0.0    0.0
+   blitLoop                          Main                    642           0    0.0    0.0     0.0    0.0
+    blitLoop.go                      Main                    643           0    0.0    0.0     0.0    0.0
+     blitThing                       Main                    644           0    0.0    0.0     0.0    0.0
+      blitThing.colors               Main                    645           1    0.0    0.0     0.0    0.0
+       defaultColors                 ZX.Screen               646           1    0.0    0.0     0.0    0.0
+ CAF:mask_rqPT                       Main                    556           0    0.0    0.0     0.0    0.0
+  main                               Main                    589           0    0.0    0.0     0.0    0.0
+   blitLoop                          Main                    590           0    0.0    0.0     0.0    0.0
+    blitLoop.go                      Main                    591           0    0.0    0.0     0.0    0.0
+     blitThing                       Main                    592           0    0.0    0.0     0.0    0.0
+      blitThing.mask                 Main                    593           1    0.0    0.0     0.0    0.0
+ CAF:lvl16_rqPN                      Main                    555           0    0.0    0.0     0.0    0.0
+  main                               Main                    577           0    0.0    0.0     0.0    0.0
+   blitLoop                          Main                    578           0    0.0    0.0     0.0    0.0
+    blitLoop.go                      Main                    579           0    0.0    0.0     0.0    0.0
+ CAF:lvl15_rqPM                      Main                    554           0    0.0    0.0     0.0    0.0
+  main                               Main                    574           0    0.0    0.0     0.0    0.0
+   blitLoop                          Main                    575           0    0.0    0.0     0.0    0.0
+    blitLoop.go                      Main                    576           0    0.0    0.0     0.0    0.0
+ CAF:a21_rqPL                        Main                    553           0    0.0    0.0     0.0    0.0
+  main                               Main                    567           0    0.0    0.0     0.0    0.0
+ CAF:lvl13_rqPJ                      Main                    552           0    0.0    0.0     0.0    0.0
+  main                               Main                    570           0    0.0    0.0     0.0    0.0
+ CAF:lvl10_rqPF                      Main                    551           0    0.0    0.0     0.0    0.0
+  main                               Main                    568           0    0.0    0.0     0.0    0.0
+ CAF:lvl7_rqPB                       Main                    550           0    0.0    0.0     0.0    0.0
+  main                               Main                    569           0    0.0    0.0     0.0    0.0
+ CAF:a19_rqPA                        Main                    549           0    0.0    0.0     0.0    0.0
+  main                               Main                    566           0    0.0    0.0     0.0    0.0
+ CAF:a18_rqPz                        Main                    548           0    0.0    0.0     0.0    0.0
+  train                              Main                    611           1    0.0    0.0     0.0    0.0
+   sprite8                           ZX.Screen               613           0    0.0    0.0     0.0    0.0
+ CAF:sprite1                         ZX.Screen               546           0    0.0    0.0     0.0    0.0
+  sprite8                            ZX.Screen               612           1    0.0    0.0     0.0    0.0
+ CAF:lvl39_ryjx                      ZX.Screen               544           0    0.0    0.0     0.0    0.0
+  screenToBytes                      ZX.Screen               603           0    0.0    0.0     0.0    0.0
+ CAF:lvl38_ryjw                      ZX.Screen               543           0    0.0    0.0     0.0    0.0
+  screenToBytes                      ZX.Screen               604           0    0.0    0.0     0.0    0.0
+ CAF:a18_ryjv                        ZX.Screen               542           0    0.0    0.0     0.0    0.0
+  screenToBytes                      ZX.Screen               605           0    0.0    0.0     0.0    0.0
+ CAF:lvl36_ryjt                      ZX.Screen               541           0    0.0    0.0     0.0    0.0
+  screenToBytes                      ZX.Screen               597           0    0.0    0.0     0.0    0.0
+ CAF:lvl35_ryjs                      ZX.Screen               540           0    0.0    0.0     0.0    0.0
+  screenToBytes                      ZX.Screen               598           0    0.0    0.0     0.0    0.0
+ CAF:lvl34_ryjr                      ZX.Screen               539           0    0.0    0.0     0.0    0.0
+  screenToBytes                      ZX.Screen               599           0    0.0    0.0     0.0    0.0
+ CAF:screenBlocksWH                  ZX.Screen               538           0    0.0    0.0     0.0    0.0
+  screenBlocksWH                     ZX.Screen               600           1    0.0    0.0     0.0    0.0
+ CAF:logicalScreenSizeWH             ZX.Screen               537           0    0.0    0.0     0.0    0.0
+  logicalScreenSizeWH                ZX.Screen               571           1    0.0    0.0     0.0    0.0
+ CAF:emptyBits                       ZX.Screen               536           0    0.0    0.0     0.0    0.0
+  emptyBits                          ZX.Screen               635           1    0.0    0.0     0.0    0.0
+ CAF:colorToRGB_brightVals           ZX.Screen               534           0    0.0    0.0     0.0    0.0
+  colorToRGB                         ZX.Screen               650           0    0.0    0.0     0.0    0.0
+   colorToRGB.brightVals             ZX.Screen               651           1    0.0    0.0     0.0    0.0
+ CAF:colorToRGB_cols                 ZX.Screen               533           0    0.0    0.0     0.0    0.0
+  colorToRGB                         ZX.Screen               652           0    0.0    0.0     0.0    0.0
+   colorToRGB.cols                   ZX.Screen               653           1    0.0    0.0     0.0    0.0
+ CAF:colorToRGB8                     ZX.Screen               532           0    0.0    0.0     0.0    0.0
+  colorToRGB                         ZX.Screen               654           0    0.0    0.0     0.0    0.0
+   colorToRGB.white                  ZX.Screen               656           1    0.0    0.0     0.0    0.0
+   colorToRGB.cols                   ZX.Screen               655           0    0.0    0.0     0.0    0.0
+ CAF:colorToRGB13                    ZX.Screen               528           0    0.0    0.0     0.0    0.0
+  colorToRGB                         ZX.Screen               670           0    0.0    0.0     0.0    0.0
+   colorToRGB.magenta                ZX.Screen               672           1    0.0    0.0     0.0    0.0
+   colorToRGB.cols                   ZX.Screen               671           0    0.0    0.0     0.0    0.0
+ CAF:colorToRGB9                     ZX.Screen               524           0    0.0    0.0     0.0    0.0
+  colorToRGB                         ZX.Screen               657           0    0.0    0.0     0.0    0.0
+   colorToRGB.white                  ZX.Screen               658           0    0.0    0.0     0.0    0.0
+ CAF:cR                              ZX.Screen               523           0    0.0    0.0     0.0    0.0
+  cR                                 ZX.Screen               659           1    0.0    0.0     0.0    0.0
+ CAF:cG                              ZX.Screen               522           0    0.0    0.0     0.0    0.0
+  cG                                 ZX.Screen               660           1    0.0    0.0     0.0    0.0
+ CAF:cB                              ZX.Screen               521           0    0.0    0.0     0.0    0.0
+  cB                                 ZX.Screen               661           1    0.0    0.0     0.0    0.0
+ CAF:blockSize                       ZX.Screen               520           0    0.0    0.0     0.0    0.0
+  blockSize                          ZX.Screen               601           1    0.0    0.0     0.0    0.0
+ CAF:sprite8Points1                  ZX.Screen               515           0    0.0    0.0     0.0    0.0
+  sprite8Points                      ZX.Screen               610           0    0.0    0.0     0.0    0.0
+ CAF:lvl_ryiH                        ZX.Screen               514           0    0.0    0.0     0.0    0.0
+  sprite8Points                      ZX.Screen               614           0    0.0    0.0     0.0    0.0
+ CAF:colorToRGB18                    ZX.Screen               513           0    0.0    0.0     0.0    0.0
+  colorToRGB                         ZX.Screen               662           0    0.0    0.0     0.0    0.0
+   colorToRGB.brightVals             ZX.Screen               663           0    0.0    0.0     0.0    0.0
+    colorToRGB.brightMultiplier      ZX.Screen               664           1    0.0    0.0     0.0    0.0
+ CAF:writeToPtr1                     ZX.Screen               511           0    0.0    0.0     0.0    0.0
+  writeToPtr                         ZX.Screen               594           1    0.0    0.0     0.0    0.0
+ CAF                                 SDL.Init                509           0    0.0    0.0     0.0    0.0
+ CAF                                 SDL.Video               505           0    0.0    0.0     0.0    0.0
+ CAF                                 SDL.Video.Renderer      503           0    0.0    0.0     0.0    0.0
+ CAF                                 Linear.Affine           493           0    0.0    0.0     0.0    0.0
+ CAF                                 Linear.V2               486           0    0.0    0.0     0.0    0.0
+ CAF                                 GHC.IO.Encoding         340           0    0.0    0.0     0.0    0.0
+ CAF                                 GHC.TopHandler          334           0    0.0    0.0     0.0    0.0
+ CAF                                 GHC.Event.Thread        333           0    0.0    0.0     0.0    0.0
+ CAF                                 GHC.Conc.Signal         323           0    0.0    0.0     0.0    0.0
+ CAF                                 GHC.IO.Handle.FD        321           0    0.0    0.0     0.0    0.0
+ CAF                                 GHC.IO.Handle.Text      320           0    0.0    0.0     0.0    0.0
+ CAF                                 GHC.Event.Control       311           0    0.0    0.0     0.0    0.0
+ CAF                                 GHC.IO.Encoding.Iconv   307           0    0.0    0.0     0.0    0.0
