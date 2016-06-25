@@ -1,0 +1,21 @@
+benchmarking screenToBytes/v4
+time                 762.9 μs   (746.2 μs .. 791.1 μs)
+                     0.991 R²   (0.982 R² .. 0.998 R²)
+mean                 801.2 μs   (770.7 μs .. 883.4 μs)
+std dev              139.8 μs   (78.71 μs .. 253.3 μs)
+variance introduced by outliers: 90% (severely inflated)
+
+benchmarking screenToBytes/v5
+time                 741.9 μs   (732.0 μs .. 761.1 μs)
+                     0.981 R²   (0.962 R² .. 0.996 R²)
+mean                 797.0 μs   (767.1 μs .. 861.0 μs)
+std dev              137.3 μs   (91.58 μs .. 205.8 μs)
+variance introduced by outliers: 90% (severely inflated)
+
+benchmarking screenToBytes/v3
+time                 2.794 ms   (2.697 ms .. 2.918 ms)
+                     0.989 R²   (0.977 R² .. 0.998 R²)
+mean                 2.968 ms   (2.862 ms .. 3.336 ms)
+std dev              533.2 μs   (256.6 μs .. 1.037 ms)
+variance introduced by outliers: 87% (severely inflated)
+

@@ -56,7 +56,8 @@ blitThing w buffer t = do
     winSurf <- getWindowSurface w
     bracket_ (lockSurface buffer) (unlockSurface buffer) $ do
         bufPtr <- surfacePixels buffer
-        screenToBytes3 screen colors (F.castPtr bufPtr)
+        -- screenToBytes3 screen colors (F.castPtr bufPtr)
+        screenToBytes4 (bitsToWords screen) colors (F.castPtr bufPtr)
         return ()
     surfaceBlit buffer Nothing winSurf Nothing
     updateWindowSurface w

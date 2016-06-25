@@ -46,5 +46,8 @@ For more accurate measurements, criterion can be used. Some interesting stuff:
  - Banging all the let-bound vars in the 'screenToBytes' tight loop slowed
    things? It seems it prevented some optimizations (~20x speedup).
 
- - Version 3, which uses a single loop var instead of the separate x/y is
-   slightly faster, if the color routine is commented.
+5.crit
+------
+
+Benchmark done with criterion, on blitting the RGB info for the bit-packed pixel
+representation. One blit is under a millisecond now.
