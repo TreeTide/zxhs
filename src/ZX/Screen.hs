@@ -21,7 +21,7 @@ import qualified Data.Vector.Unboxed as UV
 import qualified Data.Vector.Unboxed.Mutable as UMV
 import Data.Word (Word8)
 import Foreign.Marshal.Utils (copyBytes)
-import Foreign.Storable (pokeElemOff)
+import Foreign.Storable (Storable(..))
 import Foreign.Ptr (Ptr, castPtr)
 import Linear (R2, V2(..), V3(..), _x, _y, _yx, _z)
 import Linear.Affine (Point(P))
@@ -117,7 +117,24 @@ type RGB = V3 Word8
 
 data ColorFB = ColorFB !RGB !RGB
 
-precalcColor :: ScreenColors -> BV.Vector ColorFB
+instance Storable ColorFB where
+    sizeOf _ = 2 * sizeOf (undefined :: RGB)
+    {-# INLINE sizeOf #-}
+
+    alignment _ = alignment (undefined :: RGB)
+    {-# INLINE alignment #-}
+
+    poke ptr (ColorFB f b) = do
+        poke ptr' f
+        pokeElemOff ptr' 1 b
+      where ptr' = castPtr ptr
+    {-# INLINE poke #-}
+
+    peek ptr = ColorFB <$> peek ptr' <*> peekElemOff ptr' 1
+      where ptr' = castPtr ptr
+    {-# INLINE peek #-}
+
+precalcColor :: ScreenColors -> SV.Vector ColorFB
 precalcColor colors = V.fromList $ do
     cy <- [0..screenBlocksWH^._y]
     cx <- [0..screenBlocksWH^._x]
@@ -208,7 +225,7 @@ screenToBytes5 words colors ptr = go 0
     go !block = if block == (logicalScreenArea `div` blockSize) then return () else do
         let cx = block `mod` screenBlocksWH^._x
             coffs = block `div` blockSize + cx
-            colorAttrib = colVec `V.unsafeIndex` coffs
+            colorAttrib = colVec `SV.unsafeIndex` coffs
             offs = 3*block*blockSize
         goWord (words `SV.unsafeIndex` block) colorAttrib offs
         go $! block+1
