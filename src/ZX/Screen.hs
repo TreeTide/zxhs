@@ -136,8 +136,8 @@ instance Storable ColorFB where
 
 precalcColor :: ScreenColors -> SV.Vector ColorFB
 precalcColor colors = V.fromList $ do
-    cy <- [0..screenBlocksWH^._y]
-    cx <- [0..screenBlocksWH^._x]
+    cy <- [0..screenBlocksWH^._y - 1]
+    cx <- [0..screenBlocksWH^._x - 1]
     let cb = fetchColorBlock (xy cx cy)
     return $! ColorFB (foreground cb) (background cb)
   where
@@ -164,8 +164,9 @@ screenToBytes3 bits colors ptr = go 0
         let y = idx `div` logicalScreenW
             x = idx `mod` logicalScreenW
             cx = x `div` blockSize
-            iy = idx `div` blockSizeSqr
-            (ColorFB fg bg) = colVec V.! (iy + cx)
+            cy = y `div` blockSize
+            coffs = cy*(screenBlocksWH^._x) + cx
+            (ColorFB fg bg) = colVec V.! coffs
             offs = 3*idx
             col = {-# SCC "pixMember" #-}
                 if bitVec V.! idx then fg else bg
@@ -181,6 +182,7 @@ type ScreenWords = SV.Vector Word8
 
 -- | Totally wasteful way to roundtrip a batch of Word8-based sprites through
 -- a bool set to an (again Word8-based) bit vector.
+-- TODO(robinp): do bounds checking to clip pixels.
 bitsToWords :: ScreenBits -> ScreenWords
 bitsToWords bits = SV.create $ do
     v <- SMV.replicate (logicalScreenArea `div` blockSize) 0x00
@@ -198,7 +200,8 @@ screenToBytes4 words colors ptr = go 0
     go :: Int -> IO ()
     go !block = if block == (logicalScreenArea `div` blockSize) then return () else do
         let cx = block `mod` screenBlocksWH^._x
-            coffs = block `div` blockSize + cx
+            cy = block `div` screenBlocksWH^._x `div` blockSize
+            coffs = cy*(screenBlocksWH^._x) + cx
             colorAttrib = colVec V.! coffs
             offs = 3*block*blockSize
         goWord (words V.! block) colorAttrib offs

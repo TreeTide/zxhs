@@ -51,8 +51,11 @@ makeBuffer = createRGBSurface (fmap fromIntegral logicalScreenSizeWH) 24 mask
 
 blitThing :: Window -> Surface -> Int -> IO ()
 blitThing w buffer t = do
-    let screen = foldr (drawSprite train) emptyBits [xy (10+t) 10, xy 40 10]
-        colors = defaultColors (ColorBlock (Color 3) (Color 7) BrightI)
+    let screen = foldr (drawSprite train) emptyBits
+            [xy (x*10+y+(mod t 30)) (10*y) | x <- [1..20], y <- [3..15]]
+        colors = setBlockColor (ColorBlock (Color 7) (Color 0) NormalI) (xy 0 0)
+               . setBlockColor (ColorBlock (Color 4) (Color 2) NormalI) (xy 5 5)
+               $ defaultColors (ColorBlock (Color 3) (Color 7) BrightI)
     winSurf <- getWindowSurface w
     bracket_ (lockSurface buffer) (unlockSurface buffer) $ do
         bufPtr <- surfacePixels buffer
