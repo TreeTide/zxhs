@@ -213,9 +213,9 @@ screenToBytes4 words colors ptr = go 0
         goWord' :: Int -> Int -> IO ()
         goWord' !x !offs = do
             let col = if testBit w x then fg else bg
-            pokeElemOff ptr (offs) (col^._z)
+            pokeElemOff ptr (offs) (col^._x)
             pokeElemOff ptr (offs+1) (col^._y)
-            pokeElemOff ptr (offs+2) (col^._x)
+            pokeElemOff ptr (offs+2) (col^._z)
             if x == 0
                 then return ()
                 else goWord' (x-1) (offs+3)
