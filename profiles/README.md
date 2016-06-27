@@ -51,3 +51,14 @@ For more accurate measurements, criterion can be used. Some interesting stuff:
 
 Benchmark done with criterion, on blitting the RGB info for the bit-packed pixel
 representation. One blit is under a millisecond now.
+
+6.crit
+------
+Color cache data got a Storable instance, letting it stored in a Storable Vec,
+gainging a few hundred microseconds per blit.
+
+7.crit
+------
+Make sprite drawing blit directly to a Word8 vector, without roundtripping to a
+set. Also have a specific aligned and unaligned routine (the aligned one being
+slightly faster), mostly for fun.

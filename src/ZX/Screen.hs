@@ -8,7 +8,7 @@ import Control.Monad (forM_)
 import Control.Monad.ST (runST, ST)
 import Data.Array.Repa ((:.)(..), Z(Z))
 import qualified Data.Array.Repa as R
-import Data.Bits ((.|.), setBit, testBit, xor)
+import Data.Bits ((.|.), setBit, shiftL, shiftR, testBit, xor)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as B
 import qualified Data.Map.Strict as M
@@ -156,6 +156,7 @@ precalcColor colors = V.fromList $ do
 type ScreenWords = SV.Vector Word8
 
 -- TODO(robinp): do bounds checking to clip pixels.
+-- Idea: specifiable bit operation (now fixed OR)?
 bitsToWords :: ScreenBits -> ScreenWords
 bitsToWords bits = SV.create $ do
     v <- SMV.replicate (logicalScreenArea `div` blockSize) 0x00
@@ -163,18 +164,35 @@ bitsToWords bits = SV.create $ do
         let bitIndex = p^._y*logicalScreenW + p^._x
             byteIndex = bitIndex `div` blockSize
             bitOffs = bitIndex `mod` blockSize
-        -- for now just ignore the bit offset (snap to 8pixel block)
-        draw v (sprite8Bytes sprite) byteIndex
+        if bitOffs == 0
+        then drawAligned v (sprite8Bytes sprite) byteIndex
+        else drawWithBitOffset v (sprite8Bytes sprite) byteIndex bitOffs
     return $! v
   where
-    draw :: SMV.STVector s Word8 -> SV.Vector Word8 -> Int -> ST s ()
-    draw v s byteIndex = go 0 byteIndex
+    drawAligned :: SMV.STVector s Word8 -> SV.Vector Word8 -> Int -> ST s ()
+    drawAligned v s byteIndex = go 0 byteIndex
       where
         go !x _ | x == V.length s = return $! ()
         go !x !bi = do
             prev <- SMV.read v bi
             let spriteLine = s V.! x
             SMV.write v bi (prev .|. spriteLine)
+            go (x+1) (bi + screenBlocksWH^._x)
+    --
+    drawWithBitOffset
+        :: SMV.STVector s Word8 -> SV.Vector Word8 -> Int -> Int -> ST s ()
+    drawWithBitOffset v s byteIndex bitOffset = go 0 byteIndex
+      where
+        go !x _ | x == V.length s = return $! ()
+        go !x !bi = do
+            -- Still missing boundary checks.
+            prevLeft <- SMV.read v bi
+            prevRight <- SMV.read v (bi+1)
+            let spriteLine = s V.! x
+                spriteLeft = shiftR spriteLine bitOffset
+                spriteRight = shiftL spriteLine (8 - bitOffset)
+            SMV.write v bi (prevLeft .|. spriteLeft)
+            SMV.write v (bi+1) (prevRight .|. spriteRight)
             go (x+1) (bi + screenBlocksWH^._x)
 
 screenToBytes4 :: ScreenWords -> ScreenColors -> Ptr Word8 -> IO ()

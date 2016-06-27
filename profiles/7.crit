@@ -1,0 +1,21 @@
+benchmarking screenToBytes/v4
+time                 583.5 μs   (574.4 μs .. 592.7 μs)
+                     0.997 R²   (0.993 R² .. 0.999 R²)
+mean                 596.9 μs   (580.9 μs .. 651.5 μs)
+std dev              86.58 μs   (34.19 μs .. 174.4 μs)
+variance introduced by outliers: 87% (severely inflated)
+
+benchmarking bitsToWords/aligned
+time                 3.925 μs   (3.866 μs .. 3.968 μs)
+                     0.997 R²   (0.995 R² .. 0.999 R²)
+mean                 3.893 μs   (3.812 μs .. 3.960 μs)
+std dev              247.0 ns   (182.6 ns .. 310.9 ns)
+variance introduced by outliers: 74% (severely inflated)
+
+benchmarking bitsToWords/unaligned
+time                 5.647 μs   (5.388 μs .. 5.985 μs)
+                     0.985 R²   (0.971 R² .. 0.996 R²)
+mean                 5.747 μs   (5.649 μs .. 6.010 μs)
+std dev              505.9 ns   (253.7 ns .. 924.9 ns)
+variance introduced by outliers: 84% (severely inflated)
+
