@@ -15,7 +15,5 @@ main = do
     defaultMain
         [ bgroup "screenToBytes"
             [ bench "v4" $ whnfIO (screenToBytes4 words colors buf)
-            , bench "v5" $ whnfIO (screenToBytes5 words colors buf)
-            , bench "v3" $ whnfIO (screenToBytes3 screen colors buf)
             ]
         ]

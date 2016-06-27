@@ -61,10 +61,11 @@ makeBuffer = createRGBSurface (fmap fromIntegral logicalScreenSizeWH) 24 mask
 blitThing :: Renderer -> Texture -> Int -> IO ()
 blitThing renderer tex t = do
     let screen = foldr (drawSprite train) emptyBits
-            [xy (x*10+y+(mod t 30)) (10*y) | x <- [1..20], y <- [3..15]]
-        colors = setBlockColor (ColorBlock (Color 7) (Color 0) NormalI) (xy 0 0)
-               . setBlockColor (ColorBlock (Color 4) (Color 2) NormalI) (xy 5 5)
-               $ defaultColors (ColorBlock (Color 3) (Color 7) BrightI)
+            [xy (x*10+y+(mod (t `div` 10) 30)) (10*y) | x <- [1..20], y <- [3..15]]
+        colors = foldr
+            (setBlockColor (ColorBlock (Color 4) (Color 2) NormalI))
+            (defaultColors (ColorBlock (Color 3) (Color 7) BrightI))
+            [xy (2*x + if odd y then 1 else 0) y | x <- [0..15], y <- [0..24]]
     withTexture tex (screenToBytes4 (bitsToWords screen) colors . F.castPtr)
     copy renderer tex Nothing Nothing
     present renderer

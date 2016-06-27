@@ -5,10 +5,10 @@ module ZX.Screen where
 import Control.DeepSeq
 import Control.Lens ((^.))
 import Control.Monad (forM_)
-import Control.Monad.ST (runST)
+import Control.Monad.ST (runST, ST)
 import Data.Array.Repa ((:.)(..), Z(Z))
 import qualified Data.Array.Repa as R
-import Data.Bits (setBit, testBit, xor)
+import Data.Bits ((.|.), setBit, testBit, xor)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as B
 import qualified Data.Map.Strict as M
@@ -75,17 +75,20 @@ sprite8Points (Sprite8 bs) = V.fromList $ do
     if value then [xy x y] else []
 
 type PixelPos = Point V2 Int
-type ScreenBits = S.Set PixelPos
+data ScreenBits = ScreenBits
+    { screenSprites :: [DrawnSprite] }
+
+data DrawnSprite = DrawnSprite
+    { posDS :: PixelPos
+    , spriteDS :: Sprite8
+    }
 
 emptyBits :: ScreenBits
-emptyBits = S.empty
+emptyBits = ScreenBits []
 
 drawSprite :: Sprite8 -> PixelPos -> ScreenBits -> ScreenBits
-drawSprite sprite pos =
-    let cpos = fmap fromIntegral pos
-        points = V.map (cpos ^+^) (sprite8Points sprite)
-        spriteBits = S.fromList . V.toList $ points
-    in S.union spriteBits
+drawSprite sprite pos (ScreenBits sprites) =
+    ScreenBits (DrawnSprite pos sprite:sprites)
 
 -- * Color attribute block routines
 
@@ -150,49 +153,29 @@ precalcColor colors = V.fromList $ do
     foreground (ColorBlock c _ i) = colorToRGB c i
     background (ColorBlock _ c i) = colorToRGB c i
 
-precalcBits :: ScreenBits -> UV.Vector Bool
-precalcBits bits = runST $ do
-    v <- UMV.replicate logicalScreenArea False
-    mapM_ (\p -> UMV.write v (p^._y*logicalScreenW + p^._x) True) (S.toList bits)
-    UV.freeze v
-
-screenToBytes3 :: ScreenBits -> ScreenColors -> Ptr Word8 -> IO ()
-screenToBytes3 bits colors ptr = go 0
-  where
-    go :: Int -> IO ()
-    go !idx = if idx == logicalScreenArea then return () else do
-        let y = idx `div` logicalScreenW
-            x = idx `mod` logicalScreenW
-            cx = x `div` blockSize
-            cy = y `div` blockSize
-            coffs = cy*(screenBlocksWH^._x) + cx
-            (ColorFB fg bg) = colVec V.! coffs
-            offs = 3*idx
-            col = {-# SCC "pixMember" #-}
-                if bitVec V.! idx then fg else bg
-        pokeElemOff ptr (offs) (col^._z)
-        pokeElemOff ptr (offs+1) (col^._y)
-        pokeElemOff ptr (offs+2) (col^._x)
-        go $! idx+1
-    --
-    colVec = precalcColor colors
-    bitVec = precalcBits bits
-
 type ScreenWords = SV.Vector Word8
 
--- | Totally wasteful way to roundtrip a batch of Word8-based sprites through
--- a bool set to an (again Word8-based) bit vector.
 -- TODO(robinp): do bounds checking to clip pixels.
 bitsToWords :: ScreenBits -> ScreenWords
 bitsToWords bits = SV.create $ do
     v <- SMV.replicate (logicalScreenArea `div` blockSize) 0x00
-    forM_ (S.toList bits) $ \p -> do
+    forM_ (screenSprites bits) $ \(DrawnSprite p sprite) -> do
         let bitIndex = p^._y*logicalScreenW + p^._x
             byteIndex = bitIndex `div` blockSize
             bitOffs = bitIndex `mod` blockSize
-        prev <- SMV.read v byteIndex
-        SMV.write v byteIndex (setBit prev (7 - bitOffs))
+        -- for now just ignore the bit offset (snap to 8pixel block)
+        draw v (sprite8Bytes sprite) byteIndex
     return $! v
+  where
+    draw :: SMV.STVector s Word8 -> SV.Vector Word8 -> Int -> ST s ()
+    draw v s byteIndex = go 0 byteIndex
+      where
+        go !x _ | x == V.length s = return $! ()
+        go !x !bi = do
+            prev <- SMV.read v bi
+            let spriteLine = s V.! x
+            SMV.write v bi (prev .|. spriteLine)
+            go (x+1) (bi + screenBlocksWH^._x)
 
 screenToBytes4 :: ScreenWords -> ScreenColors -> Ptr Word8 -> IO ()
 screenToBytes4 words colors ptr = go 0
@@ -220,33 +203,6 @@ screenToBytes4 words colors ptr = go 0
                 else goWord' (x-1) (offs+3)
     --
     colVec = precalcColor colors
-
-screenToBytes5 :: ScreenWords -> ScreenColors -> Ptr Word8 -> IO ()
-screenToBytes5 words colors ptr = go 0
-  where
-    go :: Int -> IO ()
-    go !block = if block == (logicalScreenArea `div` blockSize) then return () else do
-        let cx = block `mod` screenBlocksWH^._x
-            coffs = block `div` blockSize + cx
-            colorAttrib = colVec `SV.unsafeIndex` coffs
-            offs = 3*block*blockSize
-        goWord (words `SV.unsafeIndex` block) colorAttrib offs
-        go $! block+1
-    goWord :: Word8 -> ColorFB -> Int -> IO ()
-    goWord !w (ColorFB fg bg) offs = goWord' 7 offs
-      where
-        goWord' :: Int -> Int -> IO ()
-        goWord' !x !offs = do
-            let col = if testBit w x then fg else bg
-            pokeElemOff ptr (offs) (col^._z)
-            pokeElemOff ptr (offs+1) (col^._y)
-            pokeElemOff ptr (offs+2) (col^._x)
-            if x == 0
-                then return ()
-                else goWord' (x-1) (offs+3)
-    --
-    colVec = precalcColor colors
-
 
 {-
 -- TODO switch to B array, gen ByteArray, directly poke?
