@@ -17,7 +17,8 @@ main = do
     buf <- mallocBytes (3*logicalScreenArea)
     let screen = trains [xy 10 10, xy 40 10]
         words = bitsToWords screen
-        colors = defaultColors (ColorBlock (Color 3) (Color 7) BrightI)
+        colors = calcColorTable $
+            defaultColors (ColorBlock (Color 3) (Color 7) BrightI)
     defaultMain
         [ bgroup "screenToBytes"
             [ bench "v4" $ whnfIO (screenToBytes4 words colors buf)

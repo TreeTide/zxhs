@@ -3,7 +3,7 @@
 
 import Control.Concurrent (threadDelay)
 import Control.Exception (bracket_, evaluate, finally)
-import Control.Monad (forM_, guard)
+import Control.Monad (forM_, guard, when)
 import Control.Lens
 import qualified Data.Set as S
 import qualified Data.Vector.Generic as V
@@ -32,6 +32,9 @@ main = do
 train :: Sprite8
 train = sprite8 [ 0x00, 0x70, 0x77, 0x52, 0x5E, 0x7F, 0x55, 0x22 ]
 
+lorry1 :: Sprite8
+lorry1 = sprite8 [ 0x00, 0x00, 0x80, 0x66, 0x18, 0xFF, 0xAA, 0x44 ]
+
 blitLoop :: Window -> Int -> IO ()
 blitLoop window t = do
     renderer <- createRenderer window (-1) defaultRenderer
@@ -43,11 +46,12 @@ blitLoop window t = do
     go renderer texture t
   where
     go renderer tex !t = do
-        print ("Loop", t)
         events <- pollEvents
         threadDelay 30001
         blitThing renderer tex t
-        if t < 100 then go renderer tex (t+1) else return ()
+        -- if t < 100 then
+        go renderer tex (t+1)
+        -- else return ()
 
 withTexture :: Texture -> (F.Ptr () -> IO ()) -> IO ()
 withTexture t f =
@@ -58,14 +62,22 @@ makeBuffer = createRGBSurface (fmap fromIntegral logicalScreenSizeWH) 24 mask
   where
     mask = V4 0xFF0000 0x00FF00 0x0000FF 0x000000
 
+bs = screenToBytes4 btsG colsG . F.castPtr
+colsG = calcColorTable $ defaultColors (ColorBlock (Color 3) (Color 0) BrightI)
+btsG = bitsToWords emptyBits
+
 blitThing :: Renderer -> Texture -> Int -> IO ()
 blitThing renderer tex t = do
     let screen = foldr (drawSprite train) emptyBits
-            [xy (x*10+y+(mod (t `div` 3) 30)) (10*y) | x <- [1..20], y <- [3..15]]
+            [xy (x*10+y+(mod (t `div` 3) 200)) (10*y) | x <- [1..1], y <- [3..4]]
+        screen2 = foldr (drawSprite lorry1) screen
+            [xy (x*10-8+y+(mod (t `div` 3) 200)) (10*y) | x <- [1..1], y <- [3..4]]
         colors = foldr
-            (setBlockColor (ColorBlock (Color 4) (Color 2) NormalI))
-            (defaultColors (ColorBlock (Color 3) (Color 7) BrightI))
+            (setBlockColor (ColorBlock (Color 3) (Color 7) NormalI))
+            (defaultColors (ColorBlock (Color 3) (Color 0) BrightI))
             [xy (2*x + if odd y then 1 else 0) y | x <- [0..15], y <- [0..24]]
-    withTexture tex (screenToBytes4 (bitsToWords screen) colors . F.castPtr)
+        cols = (defaultColors (ColorBlock (Color 3) (Color 0) BrightI))
+    withTexture tex bs
+    -- withTexture tex (screenToBytes4 (bitsToWords screen2) (calcColorTable cols) . F.castPtr)
     copy renderer tex Nothing Nothing
     present renderer

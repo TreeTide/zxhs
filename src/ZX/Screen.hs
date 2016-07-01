@@ -4,10 +4,8 @@ module ZX.Screen where
 
 import Control.DeepSeq
 import Control.Lens ((^.))
-import Control.Monad (forM_)
+import Control.Monad (forM_, unless)
 import Control.Monad.ST (runST, ST)
-import Data.Array.Repa ((:.)(..), Z(Z))
-import qualified Data.Array.Repa as R
 import Data.Bits ((.|.), setBit, shiftL, shiftR, testBit, xor)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as B
@@ -117,14 +115,36 @@ setBlockColor cb pos screenColors = screenColors
 -- * Color rendering routines
 
 type RGB = V3 Word8
+data UnpackRGB = UnpackRGB !Word8 !Word8 !Word8
 
-data ColorFB = ColorFB !RGB !RGB
-
-instance Storable ColorFB where
-    sizeOf _ = 2 * sizeOf (undefined :: RGB)
+instance Storable UnpackRGB where
+    sizeOf _ = 3 * sizeOf (undefined :: Word8)
     {-# INLINE sizeOf #-}
 
-    alignment _ = alignment (undefined :: RGB)
+    alignment _ = alignment (undefined :: Word8)
+    {-# INLINE alignment #-}
+
+    poke ptr (UnpackRGB r g b) = do
+        poke ptr' r
+        pokeElemOff ptr' 1 g
+        pokeElemOff ptr' 1 b
+      where ptr' = castPtr ptr
+    {-# INLINE poke #-}
+
+    peek ptr = UnpackRGB
+        <$> peek ptr'
+        <*> peekElemOff ptr' 1
+        <*> peekElemOff ptr' 2
+      where ptr' = castPtr ptr
+    {-# INLINE peek #-}
+
+data ColorFB = ColorFB {-# UNPACK #-} !UnpackRGB {-# UNPACK #-} !UnpackRGB
+
+instance Storable ColorFB where
+    sizeOf _ = 2 * sizeOf (undefined :: UnpackRGB)
+    {-# INLINE sizeOf #-}
+
+    alignment _ = alignment (undefined :: UnpackRGB)
     {-# INLINE alignment #-}
 
     poke ptr (ColorFB f b) = do
@@ -137,12 +157,19 @@ instance Storable ColorFB where
       where ptr' = castPtr ptr
     {-# INLINE peek #-}
 
-precalcColor :: ScreenColors -> SV.Vector ColorFB
-precalcColor colors = V.fromList $ do
+mkColorFB :: RGB -> RGB -> ColorFB
+mkColorFB fg bg = ColorFB (unpackRGB fg) (unpackRGB bg)
+  where
+    unpackRGB (V3 r g b) = UnpackRGB r g b
+
+type ColorTable = SV.Vector ColorFB
+
+calcColorTable :: ScreenColors -> ColorTable
+calcColorTable colors = V.fromList $ do
     cy <- [0..screenBlocksWH^._y - 1]
     cx <- [0..screenBlocksWH^._x - 1]
     let cb = fetchColorBlock (xy cx cy)
-    return $! ColorFB (foreground cb) (background cb)
+    return $! mkColorFB (foreground cb) (background cb)
   where
     fetchColorBlock :: BlockIndex -> ColorBlock
     fetchColorBlock bi = case M.lookup bi (colorOverrides colors) of
@@ -195,32 +222,33 @@ bitsToWords bits = SV.create $ do
             SMV.write v (bi+1) (prevRight .|. spriteRight)
             go (x+1) (bi + screenBlocksWH^._x)
 
-screenToBytes4 :: ScreenWords -> ScreenColors -> Ptr Word8 -> IO ()
+screenToBytes4 :: ScreenWords -> ColorTable -> Ptr Word8 -> IO ()
 screenToBytes4 words colors ptr = go 0
   where
     go :: Int -> IO ()
-    go !block = if block == (logicalScreenArea `div` blockSize) then return () else do
+    go !block | block == (logicalScreenArea `div` blockSize) = return $! ()
+    go !block = do
         let cx = block `mod` screenBlocksWH^._x
             cy = block `div` screenBlocksWH^._x `div` blockSize
             coffs = cy*(screenBlocksWH^._x) + cx
-            colorAttrib = colVec V.! coffs
             offs = 3*block*blockSize
-        goWord (words V.! block) colorAttrib offs
+        -- Note: either indexM or unsafeIndex allocate a lot less than plain !,
+        -- so using the monadic one (though bounds should be ok here).
+        colorAttrib <- V.indexM colors coffs
+        w <- V.indexM words block
+        goWord ptr w colorAttrib offs
         go $! block+1
-    goWord :: Word8 -> ColorFB -> Int -> IO ()
-    goWord !w (ColorFB fg bg) offs = goWord' 7 offs
-      where
-        goWord' :: Int -> Int -> IO ()
-        goWord' !x !offs = do
-            let col = if testBit w x then fg else bg
-            pokeElemOff ptr (offs) (col^._x)
-            pokeElemOff ptr (offs+1) (col^._y)
-            pokeElemOff ptr (offs+2) (col^._z)
-            if x == 0
-                then return ()
-                else goWord' (x-1) (offs+3)
-    --
-    colVec = precalcColor colors
+
+goWord :: Ptr Word8 -> Word8 -> ColorFB -> Int -> IO ()
+goWord ptr !w !(ColorFB fg bg) !offs = go 7 offs
+  where
+    go :: Int -> Int -> IO ()
+    go !x !offs = do
+        let UnpackRGB r g b = if testBit w x then fg else bg
+        pokeElemOff ptr (offs) r
+        pokeElemOff ptr (offs+1) g
+        pokeElemOff ptr (offs+2) b
+        unless (x == 0) $! go (x-1) (offs+3)
 
 {-
 -- TODO switch to B array, gen ByteArray, directly poke?

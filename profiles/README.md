@@ -62,3 +62,18 @@ gainging a few hundred microseconds per blit.
 Make sprite drawing blit directly to a Word8 vector, without roundtripping to a
 set. Also have a specific aligned and unaligned routine (the aligned one being
 slightly faster), mostly for fun.
+
+8.*
+---
+All of the following are needed for a tight loop (ad-hoc):
+- Storable, unpacked datatypes.
+- Banging the loop args.
+- Using unsafeIndex or indexM instead of !.
+- Moving a function from where-clause to top-level (Wat?).
+  Maybe this prevented creating a closure capturing some stuff.
+
+Core was dumped using
+    stack install --ghc-options="-ddump-simpl -ddump-to-file" --force-dirty
+, need to do
+    stack clean
+before to get it generated. Search for 'simpl' in local tree after.

@@ -24,7 +24,6 @@ library
                      , deepseq
                      , lens
                      , linear
-                     , repa
                      , vector
   default-language:    Haskell2010
 

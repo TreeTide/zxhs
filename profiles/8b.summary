@@ -1,0 +1,29 @@
+test-exe +RTS -sprofiles/8b.summary 
+         903,704 bytes allocated in the heap
+          40,472 bytes copied during GC
+          14,328 bytes maximum residency (1 sample(s))
+          24,752 bytes maximum slop
+               1 MB total memory in use (0 MB lost due to fragmentation)
+
+                                     Tot time (elapsed)  Avg pause  Max pause
+  Gen  0         2 colls,     0 par    0.000s   0.000s     0.0001s    0.0002s
+  Gen  1         1 colls,     0 par    0.000s   0.001s     0.0008s    0.0008s
+
+  TASKS: 4 (1 bound, 3 peak workers (3 total), using -N1)
+
+  SPARKS: 0 (0 converted, 0 overflowed, 0 dud, 0 GC'd, 0 fizzled)
+
+  INIT    time    0.003s  (  0.002s elapsed)
+  MUT     time    0.767s  (  5.937s elapsed)
+  GC      time    0.000s  (  0.001s elapsed)
+  EXIT    time    0.000s  (  0.000s elapsed)
+  Total   time    0.770s  (  5.941s elapsed)
+
+  Alloc rate    1,178,745 bytes per MUT second
+
+  Productivity  99.6% of total user, 12.9% of total elapsed
+
+gc_alloc_block_sync: 0
+whitehole_spin: 0
+gen[0].sync: 0
+gen[1].sync: 0
