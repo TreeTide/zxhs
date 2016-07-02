@@ -77,3 +77,7 @@ Core was dumped using
 , need to do
     stack clean
 before to get it generated. Search for 'simpl' in local tree after.
+
+To get a sense about allocation, run the generated binary with the `+RTS -s` or
+even `+RTS -S` flags. The latter gives immediate feedback while running, as more
+allocation tends to manifest in faster appearing lines.

@@ -25,14 +25,6 @@ import Linear (R2, V2(..), V3(..), _x, _y, _yx, _z)
 import Linear.Affine (Point(P))
 import Linear.Vector ((^*), (^/), (^+^))
 
-{-
-newtype RowMajor r2 t = RowMajor { unRowMajor :: r2 t }
-    deriving Eq
-
-instance (R2 r2, Ord t) => Ord (RowMajor r2 t) where
-    a `compare` b = a^._yx `compare` b^._yx
--}
-
 logicalScreenSizeWH :: V2 Int
 logicalScreenSizeWH = V2 logicalScreenW logicalScreenH
 
@@ -93,9 +85,11 @@ drawSprite sprite pos (ScreenBits sprites) =
 data Intensity = NormalI | BrightI
 instance NFData Intensity where rnf a = a `seq` ()
 
-newtype Color = Color { colorIndex :: Int }
+-- | Index into the standard Spectrum colors, ranging from 0 to 7.
+newtype Color = Color { colorIndex :: Word8 }
 
 data ColorBlock = ColorBlock !Color !Color !Intensity
+
 instance NFData ColorBlock where rnf a = a `seq` ()
 
 type BlockIndex = Point V2 Int
@@ -115,6 +109,9 @@ setBlockColor cb pos screenColors = screenColors
 -- * Color rendering routines
 
 type RGB = V3 Word8
+
+-- | Isomorphic to 'V3 Word8'.
+-- Used in the 'ColorTable', so the blitting code allocates less.
 data UnpackRGB = UnpackRGB !Word8 !Word8 !Word8
 
 instance Storable UnpackRGB where
@@ -138,6 +135,7 @@ instance Storable UnpackRGB where
       where ptr' = castPtr ptr
     {-# INLINE peek #-}
 
+-- | A foreground and background color used in a given color block.
 data ColorFB = ColorFB {-# UNPACK #-} !UnpackRGB {-# UNPACK #-} !UnpackRGB
 
 instance Storable ColorFB where
@@ -157,11 +155,14 @@ instance Storable ColorFB where
       where ptr' = castPtr ptr
     {-# INLINE peek #-}
 
+-- | Repacks a pair of 'RGB' colors as unpacked 'ColorFB'.
 mkColorFB :: RGB -> RGB -> ColorFB
 mkColorFB fg bg = ColorFB (unpackRGB fg) (unpackRGB bg)
   where
     unpackRGB (V3 r g b) = UnpackRGB r g b
 
+-- | Color blocks of the screen, indexed by the row-major index of the
+-- 'blockSize'*'blockSize' (here 8x8) pixel large blocks.
 type ColorTable = SV.Vector ColorFB
 
 calcColorTable :: ScreenColors -> ColorTable
@@ -222,6 +223,9 @@ bitsToWords bits = SV.create $ do
             SMV.write v (bi+1) (prevRight .|. spriteRight)
             go (x+1) (bi + screenBlocksWH^._x)
 
+-- | Core blitting routine, combines the separate pixel and color information,
+-- and writes the colored pixels to the pointed area. There must be sufficient
+-- space in that area!
 screenToBytes4 :: ScreenWords -> ColorTable -> Ptr Word8 -> IO ()
 screenToBytes4 words colors ptr = go 0
   where
@@ -237,8 +241,10 @@ screenToBytes4 words colors ptr = go 0
         colorAttrib <- V.indexM colors coffs
         w <- V.indexM words block
         goWord ptr w colorAttrib offs
-        go $! block+1
+        go (block+1)
 
+-- | Used locally by blitting routine, but generated code is better by making
+-- this separation (see readme in profiles).
 goWord :: Ptr Word8 -> Word8 -> ColorFB -> Int -> IO ()
 goWord ptr !w !(ColorFB fg bg) !offs = go 7 offs
   where
@@ -250,24 +256,6 @@ goWord ptr !w !(ColorFB fg bg) !offs = go 7 offs
         pokeElemOff ptr (offs+2) b
         unless (x == 0) $! go (x-1) (offs+3)
 
-{-
--- TODO switch to B array, gen ByteArray, directly poke?
-arrayToVector :: (V.Vector v Word8) => R.Array R.D R.DIM2 RGB -> (V2 Int, v Word8)
-arrayToVector a =
-    let vec = V.fromList . concatMap mem
-            . V.toList . R.toUnboxed . R.computeS
-            $ a
-        (Z :. h :. w) = R.extent a
-    in ((V2 w h), vec)
-  where
-    mem (V3 r g b) = [b, g, r]  -- for little-endian.
--}
-
-cR, cG, cB :: RGB
-cR = V3 1 0 0
-cG = V3 0 1 0
-cB = V3 0 0 1
-
 colorToRGB :: Color -> Intensity -> RGB
 colorToRGB (Color i) bright =
     let cols = [black, blue, red, magenta, green, cyan, yellow, white]
@@ -276,7 +264,8 @@ colorToRGB (Color i) bright =
         vals = case bright of
             NormalI -> normalVals
             BrightI -> brightVals
-    in vals V.! (i `mod` V.length vals)
+       -- TODO(robinp): use smart ctor for Color and do the modulus there.
+    in vals V.! (fromIntegral i `mod` V.length vals)
   where
     brightMultiplier BrightI = 255
     brightMultiplier NormalI = 205
@@ -288,3 +277,8 @@ colorToRGB (Color i) bright =
     cyan = cG + cB
     yellow = cR + cG
     white = cR + cG + cB
+    --
+    cR, cG, cB :: RGB
+    cR = V3 1 0 0
+    cG = V3 0 1 0
+    cB = V3 0 0 1
