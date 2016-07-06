@@ -1,14 +1,14 @@
-name:                test
+name:                zxhs
 version:             0.1.0.0
-synopsis:            Test ZX Spectrum-like graphics.
-description:         Please see README.md
-homepage:            https://github.com/githubuser/test#readme
+synopsis:            ZX Spectrum-like graphics emulation using Haskell.
+description:         Please see README.md.
+homepage:            https://github.com/TreeTide/zxhs#readme
 license:             BSD3
 license-file:        LICENSE
 author:              Robin Palotai
 maintainer:          palotai.robin@gmail.com
 copyright:           2016 Robin Palotai
-category:            Web
+category:            Game, Graphics
 build-type:          Simple
 -- extra-source-files:
 cabal-version:       >=1.10
@@ -27,25 +27,29 @@ library
                      , vector
   default-language:    Haskell2010
 
-executable test-exe
+executable zxhs-demo
   hs-source-dirs:      app
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -O2
   build-depends:       base
-                     , test, sdl2, linear, vector, lens, containers
-                     , conduit, conduit-extra, conduit-combinators, conduit-audio
+                     , containers
+                     , lens
+                     , linear
+                     , sdl2
+                     , zxhs
+                     , vector
   default-language:    Haskell2010
 
-test-suite test-test
+benchmark zxhs-bench
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
   build-depends:       base
                      , criterion
-                     , test
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+                     , zxhs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N1 -O2
   default-language:    Haskell2010
 
 source-repository head
   type:     git
-  location: https://github.com/githubuser/test
+  location: https://github.com/TreeTide/zxhs/zxhs

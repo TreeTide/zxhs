@@ -1,4 +1,7 @@
 
+This doc captures the profiling process used to ensure performant rendering.
+Try to see changes to this file along with other changes in that commit.
+
 1.prof
 ------
 
@@ -81,3 +84,11 @@ before to get it generated. Search for 'simpl' in local tree after.
 To get a sense about allocation, run the generated binary with the `+RTS -s` or
 even `+RTS -S` flags. The latter gives immediate feedback while running, as more
 allocation tends to manifest in faster appearing lines.
+
+Note: test-exe was renamed to zxhs-demo.
+
+Resources
+---------
+
+- http://johantibell.com/files/HE2015.pdf
+- http://www.serpentine.com/criterion/tutorial.html
