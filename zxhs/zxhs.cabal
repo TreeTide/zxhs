@@ -17,6 +17,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     Lib
                        ZX.Screen
+                     , ZX.Data.Chars
   ghc-options:         -O2 -funfolding-use-threshold=16 -optc-O3
   build-depends:       base >= 4.7 && < 5
                      , bytestring

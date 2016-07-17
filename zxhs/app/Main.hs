@@ -17,6 +17,7 @@ import Linear (V2(..), V4(..), _x, _y)
 import Linear.Affine (Point(P))
 import Linear.Vector ((^*), (^+^))
 
+import ZX.Data.Chars (stringToSprites)
 import ZX.Screen
 
 main :: IO ()
@@ -72,12 +73,15 @@ blitThing renderer tex t = do
             [xy (x*10+y+(mod (t `div` 3) 200)) (10*y) | x <- [1..1], y <- [3..4]]
         screen2 = foldr (drawSprite lorry1) screen
             [xy (x*10-8+y+(mod (t `div` 3) 200)) (10*y) | x <- [1..1], y <- [3..4]]
+        txts = stringToSprites "Hello^World!"
+        screen3 = foldr (\(i,s) -> drawSprite s (xy (i*8 + 10) 140)) screen2
+                      ([0..] `zip` txts)
         colors = foldr
             (setBlockColor (ColorBlock (Color 3) (Color 7) NormalI))
             (defaultColors (ColorBlock (Color 3) (Color 0) BrightI))
             [xy (2*x + if odd y then 1 else 0) y | x <- [0..15], y <- [0..24]]
         cols = (defaultColors (ColorBlock (Color 3) (Color 0) BrightI))
-    withTexture tex bs
-    -- withTexture tex (screenToBytes4 (bitsToWords screen2) (calcColorTable cols) . F.castPtr)
+    -- withTexture tex bs
+    withTexture tex (screenToBytes4 (bitsToWords screen3) (calcColorTable cols) . F.castPtr)
     copy renderer tex Nothing Nothing
     present renderer

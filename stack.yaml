@@ -5,6 +5,7 @@ resolver: lts-6.1
 
 packages:
 - 'zxhs'
+- 'rom-charset'
 
 extra-deps:
 - containers-deepseq-0.1.0.1
