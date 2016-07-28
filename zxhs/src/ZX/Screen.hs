@@ -1,9 +1,10 @@
 {-# LANGUAGE BangPatterns  #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell #-}
 module ZX.Screen where
 
 import Control.DeepSeq
-import Control.Lens ((^.))
+import Control.Lens ((^.), (?~), at, makeLenses)
 import Control.Monad (forM_, unless)
 import Control.Monad.ST (runST, ST)
 import Data.Bits ((.|.), setBit, shiftL, shiftR, testBit, xor)
@@ -65,46 +66,65 @@ sprite8Points (Sprite8 bs) = V.fromList $ do
     if value then [xy x y] else []
 
 type PixelPos = Point V2 Int
-data ScreenBits = ScreenBits
-    { screenSprites :: [DrawnSprite] }
 
-data DrawnSprite = DrawnSprite
-    { posDS :: PixelPos
-    , spriteDS :: Sprite8
+data DisplaySprite = DisplaySprite
+    { _posDS :: PixelPos
+    , _spriteDS :: Sprite8
     }
+makeLenses ''DisplaySprite
 
-emptyBits :: ScreenBits
-emptyBits = ScreenBits []
+data DisplayList = DisplayList
+    { _displaySprites :: [DisplaySprite] }
 
-drawSprite :: Sprite8 -> PixelPos -> ScreenBits -> ScreenBits
-drawSprite sprite pos (ScreenBits sprites) =
-    ScreenBits (DrawnSprite pos sprite:sprites)
+makeLenses ''DisplayList
+
+emptyBits :: DisplayList
+emptyBits = DisplayList []
+
+drawSprite :: Sprite8 -> PixelPos -> DisplayList -> DisplayList
+drawSprite sprite pos (DisplayList sprites) =
+    DisplayList (DisplaySprite pos sprite:sprites)
 
 -- * Color attribute block routines
 
 data Intensity = NormalI | BrightI
 instance NFData Intensity where rnf a = a `seq` ()
+-- | Smart constructors for creating intensity values.
+-- Prefer these to using the ctors directly.
+normalI, brightI :: Intensity
+normalI = NormalI
+brightI = BrightI
+-- | Case selection on Intensity, abstracts away the actual representation.
+foldI :: a -> a -> Intensity -> a
+foldI normal bright intensity = case intensity of
+    NormalI -> normal
+    BrightI -> bright
 
 -- | Index into the standard Spectrum colors, ranging from 0 to 7.
 newtype Color = Color { colorIndex :: Word8 }
 
-data ColorBlock = ColorBlock !Color !Color !Intensity
+data ColorBlock = ColorBlock
+    { _fgCB :: !Color
+    , _bgCB :: !Color
+    , _intensityCB :: !Intensity
+    }
+makeLenses ''ColorBlock
 
 instance NFData ColorBlock where rnf a = a `seq` ()
 
 type BlockIndex = Point V2 Int
 
 data ScreenColors = ScreenColors
-    { defaultColor :: !ColorBlock
-    , colorOverrides :: !(M.Map BlockIndex ColorBlock)
+    { _defaultColor :: !ColorBlock
+    , _colorOverrides :: !(M.Map BlockIndex ColorBlock)
     }
+makeLenses ''ScreenColors
 
 defaultColors :: ColorBlock -> ScreenColors
 defaultColors cb = ScreenColors cb M.empty
 
 setBlockColor :: ColorBlock -> BlockIndex -> ScreenColors -> ScreenColors
-setBlockColor cb pos screenColors = screenColors
-    { colorOverrides = M.insert pos cb (colorOverrides screenColors) }
+setBlockColor cb pos = colorOverrides.at pos ?~ cb
 
 -- * Color rendering routines
 
@@ -173,9 +193,9 @@ calcColorTable colors = V.fromList $ do
     return $! mkColorFB (foreground cb) (background cb)
   where
     fetchColorBlock :: BlockIndex -> ColorBlock
-    fetchColorBlock bi = case M.lookup bi (colorOverrides colors) of
+    fetchColorBlock bi = case M.lookup bi (_colorOverrides colors) of
         Just cb -> cb
-        Nothing -> defaultColor colors
+        Nothing -> _defaultColor colors
     --
     foreground, background :: ColorBlock -> RGB
     foreground (ColorBlock c _ i) = colorToRGB c i
@@ -185,10 +205,10 @@ type ScreenWords = SV.Vector Word8
 
 -- TODO(robinp): do bounds checking to clip pixels.
 -- Idea: specifiable bit operation (now fixed OR)?
-bitsToWords :: ScreenBits -> ScreenWords
+bitsToWords :: DisplayList -> ScreenWords
 bitsToWords bits = SV.create $ do
     v <- SMV.replicate (logicalScreenArea `div` blockSize) 0x00
-    forM_ (screenSprites bits) $ \(DrawnSprite p sprite) -> do
+    forM_ (_displaySprites bits) $ \(DisplaySprite p sprite) -> do
         let bitIndex = p^._y*logicalScreenW + p^._x
             byteIndex = bitIndex `div` blockSize
             bitOffs = bitIndex `mod` blockSize
@@ -225,7 +245,7 @@ bitsToWords bits = SV.create $ do
 
 -- | Core blitting routine, combines the separate pixel and color information,
 -- and writes the colored pixels to the pointed area. There must be sufficient
--- space in that area!
+-- space in that area ('logicalScreenArea' * 3 bytes)!
 screenToBytes4 :: ScreenWords -> ColorTable -> Ptr Word8 -> IO ()
 screenToBytes4 words colors ptr = go 0
   where
@@ -259,16 +279,14 @@ goWord ptr !w !(ColorFB fg bg) !offs = go 7 offs
 colorToRGB :: Color -> Intensity -> RGB
 colorToRGB (Color i) bright =
     let cols = [black, blue, red, magenta, green, cyan, yellow, white]
-        brightVals = SV.fromList $ map (^* brightMultiplier BrightI) cols
-        normalVals = SV.fromList $ map (^* brightMultiplier NormalI) cols
-        vals = case bright of
-            NormalI -> normalVals
-            BrightI -> brightVals
+        brightVals = SV.fromList $ map (^* brightMultiplier brightI) cols
+        normalVals = SV.fromList $ map (^* brightMultiplier normalI) cols
+        -- | Not using a single, bright-dependent mapping, to faciliate sharing.
+        vals = foldI normalVals brightVals bright
        -- TODO(robinp): use smart ctor for Color and do the modulus there.
     in vals V.! (fromIntegral i `mod` V.length vals)
   where
-    brightMultiplier BrightI = 255
-    brightMultiplier NormalI = 205
+    brightMultiplier = foldI 205 255
     black = 0
     blue = cB
     red = cR

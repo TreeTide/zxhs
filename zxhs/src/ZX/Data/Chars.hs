@@ -6,10 +6,14 @@ signoff at http://www.worldofspectrum.org/permits/amstrad-roms.txt.
 module ZX.Data.Chars where
 
 import Data.Char (chr, ord)
+import Data.Text (Text, unpack)
 import ZX.Screen (sprite8, Sprite8)
 
 stringToSprites :: String -> [Sprite8]
 stringToSprites = map charToSprite
+
+textToSprites :: Text -> [Sprite8]
+textToSprites = stringToSprites . unpack
 
 charToSprite :: Char -> Sprite8
 charToSprite c
