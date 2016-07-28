@@ -115,16 +115,14 @@ instance NFData ColorBlock where rnf a = a `seq` ()
 type BlockIndex = Point V2 Int
 
 data ScreenColors = ScreenColors
-    { _defaultColor :: !ColorBlock
-    , _colorOverrides :: !(M.Map BlockIndex ColorBlock)
-    }
+    { _blocksSC :: !(M.Map BlockIndex ColorBlock) }
 makeLenses ''ScreenColors
 
-defaultColors :: ColorBlock -> ScreenColors
-defaultColors cb = ScreenColors cb M.empty
+defaultColors :: ScreenColors
+defaultColors = ScreenColors M.empty
 
 setBlockColor :: ColorBlock -> BlockIndex -> ScreenColors -> ScreenColors
-setBlockColor cb pos = colorOverrides.at pos ?~ cb
+setBlockColor cb pos = blocksSC.at pos ?~ cb
 
 -- * Color rendering routines
 
@@ -144,7 +142,7 @@ instance Storable UnpackRGB where
     poke ptr (UnpackRGB r g b) = do
         poke ptr' r
         pokeElemOff ptr' 1 g
-        pokeElemOff ptr' 1 b
+        pokeElemOff ptr' 2 b
       where ptr' = castPtr ptr
     {-# INLINE poke #-}
 
@@ -193,13 +191,14 @@ calcColorTable colors = V.fromList $ do
     return $! mkColorFB (foreground cb) (background cb)
   where
     fetchColorBlock :: BlockIndex -> ColorBlock
-    fetchColorBlock bi = case M.lookup bi (_colorOverrides colors) of
-        Just cb -> cb
-        Nothing -> _defaultColor colors
+    fetchColorBlock bi = M.findWithDefault defaultColor bi (_blocksSC colors)
     --
     foreground, background :: ColorBlock -> RGB
     foreground (ColorBlock c _ i) = colorToRGB c i
     background (ColorBlock _ c i) = colorToRGB c i
+
+defaultColor :: ColorBlock
+defaultColor = ColorBlock (Color 0) (Color 7) NormalI
 
 type ScreenWords = SV.Vector Word8
 

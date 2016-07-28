@@ -19,6 +19,8 @@ import Linear.Vector ((^*), (^+^))
 
 import ZX.Data.Chars (stringToSprites)
 import ZX.Screen
+import ZX.Screen.Monad.Class
+import ZX.Screen.Monad.Pure (renderPureScreen)
 
 main :: IO ()
 main = do
@@ -64,7 +66,7 @@ makeBuffer = createRGBSurface (fmap fromIntegral logicalScreenSizeWH) 24 mask
     mask = V4 0xFF0000 0x00FF00 0x0000FF 0x000000
 
 bs = screenToBytes4 btsG colsG . F.castPtr
-colsG = calcColorTable $ defaultColors (ColorBlock (Color 3) (Color 0) BrightI)
+colsG = calcColorTable defaultColors
 btsG = bitsToWords emptyBits
 
 blitThing :: Renderer -> Texture -> Int -> IO ()
@@ -77,11 +79,16 @@ blitThing renderer tex t = do
         screen3 = foldr (\(i,s) -> drawSprite s (xy (i*8 + 10) 140)) screen2
                       ([0..] `zip` txts)
         colors = foldr
-            (setBlockColor (ColorBlock (Color 3) (Color 7) NormalI))
-            (defaultColors (ColorBlock (Color 3) (Color 0) BrightI))
-            [xy (2*x + if odd y then 1 else 0) y | x <- [0..15], y <- [0..24]]
-        cols = (defaultColors (ColorBlock (Color 3) (Color 0) BrightI))
+            (setBlockColor (ColorBlock (Color 2) (Color 3) NormalI))
+            defaultColors
+            [xy (2*x + if odd y then 1 else 0) y | x <- [0..10], y <- [0..23]]
+        cols = defaultColors
     -- withTexture tex bs
-    withTexture tex (screenToBytes4 (bitsToWords screen3) (calcColorTable cols) . F.castPtr)
+    withTexture tex (screenToBytes4 (bitsToWords screen3) (calcColorTable colors) . F.castPtr)
+    withTexture tex $ renderPureScreen (do
+        bg (Color 3) (xy 0 0)
+        fg (Color 4) (xy 1 1)
+        draw train (xy 5 100)
+        write "Hello, World!" (xy 5 5)) . F.castPtr
     copy renderer tex Nothing Nothing
     present renderer

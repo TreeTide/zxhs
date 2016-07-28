@@ -3,23 +3,28 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 module ZX.Screen.Monad.Pure
     ( PureScreen
+    , renderPureScreen
     ) where
 
 import Control.Lens
 import Control.Monad (foldM_)
-import Control.Monad.Trans.State
+import Control.Monad.IO.Class
+import Control.Monad.Trans.State.Strict
 import Data.Text (Text)
+import Data.Word (Word8)
+import Foreign.Ptr (Ptr)
 import Linear (_x)
 import ZX.Data.Chars (textToSprites)
 import ZX.Screen
     ( BlockIndex, Color, ColorBlock(ColorBlock)
-    , DisplayList, DisplaySprite(..)
+    , DisplayList(..), DisplaySprite(..)
     , Intensity, PixelPos
-    , ScreenColors, Sprite8
+    , ScreenColors, blocksSC, defaultColors, defaultColor
+    , Sprite8
     , blockSize
-    , colorOverrides
     , displaySprites
     , fgCB, bgCB, intensityCB
+    , bitsToWords, calcColorTable, screenToBytes4
     )
 import ZX.Screen.Monad.Class
 
@@ -31,6 +36,14 @@ data ScreenState = ScreenState
 makeLenses ''ScreenState
 
 type PureScreen m = StateT ScreenState m
+
+renderPureScreen :: (MonadIO m) => PureScreen m a -> Ptr Word8 -> m a
+renderPureScreen ps ptr = do
+    (r, s) <- runStateT ps (ScreenState (DisplayList []) defaultColors)
+    let screenWords = bitsToWords (s^.display.to (displaySprites %~ reverse))
+        colorWords = calcColorTable (s^.colors)
+    liftIO (screenToBytes4 screenWords colorWords ptr)
+    return $! r
 
 instance (Monad m) => ZXScreen (PureScreen m) where
     -- draw :: Sprite8 -> PixelPos -> PureScreen ()
@@ -44,14 +57,19 @@ instance (Monad m) => ZXScreen (PureScreen m) where
             return $! pos & _x +~ blockSize
 
     -- fg :: Color -> BlockIndex -> PureScreen ()
-    fg c bi = colors.colorOverrides.at bi %= over _Just (fgCB .~ c)
+    fg c bi = colors.blocksSC.at bi %= defaultSet fgCB c
 
     -- bg :: Color -> BlockIndex -> PureScreen ()
-    bg c bi = colors.colorOverrides.at bi %= over _Just (bgCB .~ c)
+    bg c bi = colors.blocksSC.at bi %= defaultSet bgCB c
 
     -- intensity :: Intensity -> BlockIndex -> PureScreen ()
-    intensity i bi = colors.colorOverrides.at bi %=
-        over _Just (intensityCB .~ i)
+    intensity i bi = colors.blocksSC.at bi %= defaultSet intensityCB i
 
     -- color :: ColorBlock -> BlockIndex -> PureScreen ()
-    color cb bi = colors.colorOverrides.at bi ?= cb
+    color cb bi = colors.blocksSC.at bi ?= cb
+
+defaultSet len a mbCol = case mbCol of
+    Nothing -> Just (setOn defaultColor)
+    Just c  -> Just (setOn c)
+  where
+    setOn c = c & len .~ a
