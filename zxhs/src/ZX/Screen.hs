@@ -100,8 +100,22 @@ foldI normal bright intensity = case intensity of
     NormalI -> normal
     BrightI -> bright
 
--- | Index into the standard Spectrum colors, ranging from 0 to 7.
+-- | Number of base colors supported by the ZX Spectrum.
+-- Does not include variations due to intensity.
+colorCount :: Int
+colorCount = 8
+
+-- | Index into the standard Spectrum colors, ranging from 0 to 'colorCount'-1.
 newtype Color = Color { colorIndex :: Word8 }
+    deriving (Eq, Ord)
+
+-- | Smart constructor for 'Color', mapping the argument into the allowed color
+-- range using modulus (the color numbers wrap around).
+colorNum :: Int -> Color
+colorNum = Color . fromIntegral . (`mod` colorCount)
+
+nextColor :: Color -> Color
+nextColor (Color i) = colorNum (fromIntegral $ i + 1)
 
 data ColorBlock = ColorBlock
     { _fgCB :: !Color
@@ -112,6 +126,10 @@ makeLenses ''ColorBlock
 
 instance NFData ColorBlock where rnf a = a `seq` ()
 
+swapColors :: ColorBlock -> ColorBlock
+swapColors (ColorBlock f b i) = ColorBlock b f i
+
+-- TODO(robinp): stronger type to avoid mixing up block and pixel coords.
 type BlockIndex = Point V2 Int
 
 data ScreenColors = ScreenColors
@@ -283,7 +301,7 @@ colorToRGB (Color i) bright =
         -- | Not using a single, bright-dependent mapping, to faciliate sharing.
         vals = foldI normalVals brightVals bright
        -- TODO(robinp): use smart ctor for Color and do the modulus there.
-    in vals V.! (fromIntegral i `mod` V.length vals)
+    in vals V.! (fromIntegral i)
   where
     brightMultiplier = foldI 205 255
     black = 0

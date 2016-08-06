@@ -29,19 +29,45 @@ main = do
     window <- createWindow "ZxHs" defaultWindow
         { windowInitialSize = fmap ((3*) . fromIntegral) logicalScreenSizeWH
         , windowPosition = Absolute (P (V2 5 5))
+        , windowMode = Windowed
         }
     blitLoop window 0
 
 train :: Sprite8
 train = sprite8 [ 0x00, 0x70, 0x77, 0x52, 0x5E, 0x7F, 0x55, 0x22 ]
+train1 = sprite8 [ 0x00, 0x70, 0x77, 0x52, 0x5E, 0x7F, 0x5F, 0x22 ]
+train2 = sprite8 [ 0x00, 0x70, 0x77, 0x52, 0x5E, 0x7F, 0x55, 0x3E ]
+train3 = sprite8 [ 0x00, 0x70, 0x77, 0x52, 0x5E, 0x7F, 0x7D, 0x22 ]
 
 lorry1 :: Sprite8
 lorry1 = sprite8 [ 0x00, 0x00, 0x80, 0x66, 0x18, 0xFF, 0xAA, 0x44 ]
 
+dither1o2, dither3o8, dither1o4, dither1o8, dither1o16 :: Sprite8
+dither1o2 = loop8 [0x55, 0xAA]
+dither3o8 = loop8 [0x55, 0x22, 0x55, 0x88]
+dither1o4 = loop8 [0x55, 0x00]
+dither1o8 = loop8 [0x44, 0x00, 0x11, 0x00]
+dither1o16 = loop8 [0x00, 0x00, 0x11, 0x00]
+
+loop8 = sprite8 . take 8 . cycle
+
+dithers =
+    [ dither1o2
+    , dither3o8
+    , dither1o4
+    , dither1o4
+    , dither1o8
+    , dither1o16
+    , dither1o16
+    , dither1o16
+    ]
+
 blitLoop :: Window -> Int -> IO ()
 blitLoop window t = do
     renderer <- createRenderer window (-1) defaultRenderer
-        { rendererTargetTexture = True }
+        { rendererTargetTexture = True
+        , rendererType = AcceleratedRenderer
+        }
     texture <- createTexture renderer
         RGB24  -- This doesn't have any byte gap, while RGB888 seems to.
         TextureAccessStreaming
@@ -56,39 +82,56 @@ blitLoop window t = do
         go renderer tex (t+1)
         -- else return ()
 
-withTexture :: Texture -> (F.Ptr () -> IO ()) -> IO ()
+withTexture :: Texture -> (F.Ptr Word8 -> IO ()) -> IO ()
 withTexture t f =
-    (lockTexture t Nothing >>= (f . fst)) `finally` unlockTexture t
+    (lockTexture t Nothing >>= (f . F.castPtr . fst)) `finally` unlockTexture t
 
-makeBuffer :: IO Surface
-makeBuffer = createRGBSurface (fmap fromIntegral logicalScreenSizeWH) 24 mask
-  where
-    mask = V4 0xFF0000 0x00FF00 0x0000FF 0x000000
-
-bs = screenToBytes4 btsG colsG . F.castPtr
-colsG = calcColorTable defaultColors
-btsG = bitsToWords emptyBits
+xyOfBlock x y = xy (blockSize*x) (blockSize*y)
 
 blitThing :: Renderer -> Texture -> Int -> IO ()
 blitThing renderer tex t = do
-    let screen = foldr (drawSprite train) emptyBits
-            [xy (x*10+y+(mod (t `div` 3) 200)) (10*y) | x <- [1..1], y <- [3..4]]
-        screen2 = foldr (drawSprite lorry1) screen
-            [xy (x*10-8+y+(mod (t `div` 3) 200)) (10*y) | x <- [1..1], y <- [3..4]]
-        txts = stringToSprites "Hello^World!"
-        screen3 = foldr (\(i,s) -> drawSprite s (xy (i*8 + 10) 140)) screen2
-                      ([0..] `zip` txts)
-        colors = foldr
-            (setBlockColor (ColorBlock (Color 2) (Color 3) NormalI))
-            defaultColors
-            [xy (2*x + if odd y then 1 else 0) y | x <- [0..10], y <- [0..23]]
-        cols = defaultColors
-    -- withTexture tex bs
-    withTexture tex (screenToBytes4 (bitsToWords screen3) (calcColorTable colors) . F.castPtr)
-    withTexture tex $ renderPureScreen (do
+    clear renderer
+    withTexture tex . renderPureScreen $ do
         bg (Color 3) (xy 0 0)
         fg (Color 4) (xy 1 1)
-        draw train (xy 5 100)
-        write "Hello, World!" (xy 5 5)) . F.castPtr
+        mapM_ (bg (Color 5)) [xy x 0 | x <- [0..31]]
+        mapM_ (bg (Color 6)) [xy x 1 | x <- [0..31]]
+        forM_ [0..7] $ \y -> do
+            write "Hello ZxHs!" (xyOfBlock 0 y)
+            let trainY = 12*8 + 4  -- Offset half block so it's funnier.
+            draw train (xy trainY (y*8))
+            draw lorry1 (xy (trainY-8) (y*8))
+            forM_ [0..31] $ \x -> do
+                let pos = xy x y
+                    bgCol = colorNum x
+                    fgCol = colorNum y
+                    rightSide = x >= 16
+                    fgColDifferent = if fgCol == bgCol && not rightSide
+                                     then nextColor fgCol else fgCol
+                    bright = if odd (x `div` 8)
+                             then brightI else normalI
+                color (ColorBlock fgColDifferent bgCol bright) (xy x y)
+                when rightSide $ do
+                    color (ColorBlock fgCol bgCol bright) (xy x (y+8))
+                    color (ColorBlock fgCol bgCol bright) (xy x (y+16))
+                    draw dither1o2 (xyOfBlock x y)
+                    draw dither1o4 (xyOfBlock x (y+8))
+                    draw dither1o8 (xyOfBlock x (y+16))
+        forM_ [0..15] $ \x ->
+            forM_ (reverse dithers `zip` [0..7]) $ \(sprite, y) -> do
+                let top = xy x (8+y)
+                    bottom = xy x (23-y)
+                    col = ColorBlock (colorNum 1) (colorNum 7) normalI
+                color col top
+                draw sprite (fmap (*8) top)
+                color (swapColors col) bottom
+                draw sprite (fmap (*8) bottom)
     copy renderer tex Nothing Nothing
     present renderer
+
+ani t = case (t `mod` 12) `div` 3 of
+    0 -> train
+    1 -> train1
+    2 -> train2
+    3 -> train3
+    _ -> train
