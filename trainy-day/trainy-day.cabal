@@ -1,0 +1,45 @@
+name:                trainy-day
+version:             0.1.0.0
+synopsis:            Train transportation game with ZX Spectrum-like gfx, originally for Ludum Dare 36.
+description:         Please see README.md.
+homepage:            https://github.com/TreeTide/zxhs/trainy-day
+license:             BSD3
+license-file:        LICENSE
+author:              Robin Palotai
+maintainer:          palotai.robin@gmail.com
+copyright:           2016 Robin Palotai
+category:            Game, Graphics
+build-type:          Simple
+-- extra-source-files:
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Game.RawTiles
+                       Game.Tiles
+  build-depends:       base >= 4.7 && < 5
+                     , containers
+                     , text
+                     , vector
+                     , zxhs
+  default-language:    Haskell2010
+
+
+executable trainy-day
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  build-depends:       base
+                     , containers
+                     , lens
+                     , linear
+                     , sdl2
+                     , text
+                     , trainy-day
+                     , transformers
+                     , vector
+                     , zxhs
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/TreeTide/zxhs

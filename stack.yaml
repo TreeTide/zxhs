@@ -7,6 +7,7 @@ packages:
 - 'zxhs'
 - 'numberify-image'
 - 'rom-charset'
+- 'trainy-day'
 
 extra-deps:
 - containers-deepseq-0.1.0.1

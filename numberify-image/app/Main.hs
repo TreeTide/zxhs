@@ -28,23 +28,35 @@ main = do
 tileSize :: Int
 tileSize = 8
 
+-- | Hacky way to generate source-embeddable image data.
+-- Somewhat useful if you don't want the main binary to depend on any image
+-- loading libs.
 process :: Pic.DynamicImage -> IO ()
-process dynImage = do
+process dynImg = do
+    let tiles = extractTiles dynImg
+    putStrLn "tiles :: [[Sprite8]]"
+    putStrLn ("tiles = [" ++ concat (intersperse "," . map showTileRow $ tiles) ++ "]")
+  where
+    showTileRow :: [Tile] -> String
+    showTileRow ts = "[" ++ concat (intersperse "," . map showTile $ ts) ++ "]"
+    showTile :: Tile -> String
+    showTile t = "sprite8 [" ++ concat (intersperse "," . map show $ t) ++ "]"
+
+-- TODO extract the converter into a reusable lib.
+
+type Tile = [Int]
+
+extractTiles :: Pic.DynamicImage -> [[Tile]]
+extractTiles dynImage = do
     let img = Pic.convertRGBA8 dynImage
         w = Pic.imageWidth img
         h = Pic.imageHeight img
-    forM_ [0 .. (h `div` tileSize) - 1] $ \blockY ->
-    	forM_ [0 .. (w `div` tileSize) - 1] $ \blockX ->
-            printTile img blockY blockX
+    for [0 .. (h `div` tileSize) - 1] $ \blockY ->
+    	for [0 .. (w `div` tileSize) - 1] $ \blockX ->
+            makeTile img blockY blockX
 
-printTile :: Pic.Image Pic.PixelRGBA8 -> Int -> Int -> IO ()
-printTile img blockY blockX = do
-    let rows = map rowToNumber [0 .. tileSize - 1]
-        varName = "block" ++ show blockY ++ "_" ++ show blockX
-    putStrLn (varName ++ " :: Sprite8")
-    putStrLn ("varName = sprite8 [" ++
-              concat (intersperse "," . map show $ rows)
-              ++ "]")
+makeTile :: Pic.Image Pic.PixelRGBA8 -> Int -> Int -> Tile
+makeTile img blockY blockX = map rowToNumber [0 .. tileSize - 1]
   where
     rowToNumber :: Int -> Int  -- Could be Word8 with 8-pixel tile.
     rowToNumber rowIndex =
@@ -56,5 +68,7 @@ printTile img blockY blockX = do
                          -- Black-white image assumed, so only checking R instead any.
                          -- Black non-transparent pixel counts as 'on', otherwise 'off'.
 			 toBinary (Pic.PixelRGBA8 r _ _ a) =
-			     bool 0 1 (a < 10 || r > 10)
-        in foldr (\pix existing -> 2*existing + pix) 0 values
+			     bool 1 0 (a < 10 || r > 10)
+        in foldl (\existing pix -> 2*existing + pix) 0 values
+
+for = flip map
