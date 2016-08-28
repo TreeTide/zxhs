@@ -5,6 +5,7 @@ resolver: lts-6.1
 
 packages:
 - 'zxhs'
+- 'numberify-image'
 - 'rom-charset'
 
 extra-deps:
