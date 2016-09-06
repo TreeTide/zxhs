@@ -15,10 +15,13 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Game.RawTiles
+  exposed-modules:     Game.Logic
+                       Game.RawTiles
                        Game.Tiles
   build-depends:       base >= 4.7 && < 5
                      , containers
+                     , lens
+                     , linear
                      , text
                      , vector
                      , zxhs
