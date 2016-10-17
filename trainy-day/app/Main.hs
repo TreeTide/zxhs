@@ -66,7 +66,7 @@ withTexture t f =
     (lockTexture t Nothing >>= (f . F.castPtr . fst)) `finally` unlockTexture t
 
 game0 :: GS
-game0 = GS r0 [t0, t1]
+game0 = GS r0 [t0, t1] 0
   where
     r0 :: Rails
     r0 = M.fromList  -- A circle
@@ -101,19 +101,23 @@ renderRails = mapM_ (uncurry renderTrack) . M.toList
     --
     trackGfx = foldTrackDir trackH bendUL bendDL bendUR bendDR trackV
 
-renderTrain :: ZXScreen m => Train -> m ()
-renderTrain t =
+renderTrain :: ZXScreen m => Int -> Train -> m ()
+renderTrain steps t =
     let unitOffset = (round . (*(fromIntegral blockSize))) <$> positionInTile (t^.engine)
         tileCorner = (blockSize*) <$> (t^.engine.tilePos)
         trainPivot = xy (-8) (-16)  -- TODO manage sprite pivots less manualy
         pos = tileCorner ^+^ unitOffset ^+^ trainPivot
-    in drawCompound train pos
-       -- TODO mirror based on heading direction
+        cloudOffset = xy 8 (-8)
+    in do
+        -- TODO mirror based on heading direction
+        drawCompound train pos
+        -- TODO kind of hack now, have rather separate cloud decals as entities
+        draw (animate steamSequence 5 (steps + (7*t^.number))) (pos ^+^ cloudOffset)
 
 renderGS :: ZXScreen m => GS -> m ()
 renderGS gs = do
     renderRails (gs^.rails)
-    mapM_ renderTrain (gs^.trains)
+    mapM_ (renderTrain (gs^.gameStep)) (gs^.trains)
 
 -- TODO really have to make stuff work transparently with either of
 -- xy or block-xy, which should be different types.
@@ -143,7 +147,7 @@ blitThing renderer tex t = do
     present renderer
   where
     -- For now a very dumb update, doesn't deal with track transitions etc.
-    update t g = g & trains.each.engine.progress +~ t
+    update t g = g & trains.each.engine.progress +~ t & gameStep .~ t
 
 animate :: [Sprite8] -> Int -> Int -> Sprite8
 animate sps tickDiv t =
@@ -153,9 +157,12 @@ animate sps tickDiv t =
 allFor a = flip runReaderT a . ReaderT
 
 -- TODO should be common utility in ZxHs.
-drawCompound sps pos =
-    forM_ (sps `zip` [0..]) $ \(rowData, rowIndex) ->
-        forM_ (rowData `zip` [0..]) $ \(sprite, colIndex) -> do
-            -- TODO HACK make it possible to color all affected tiles
-            fg (Color 1) (fmap (`div` blockSize) pos ^+^ xy colIndex rowIndex)
-            draw sprite (pos ^+^ xy (colIndex * blockSize) (rowIndex * blockSize))
+drawCompound multi pos =
+    traverseMulti multi $ \(Element elemPos sprite) -> do
+        let rowIndex = elemPos^._y
+            colIndex = elemPos^._x
+            -- TODO HACK make it possible to color all affected tiles (considering overlap)
+            pixelPos = pos ^+^ xy (colIndex * blockSize) (rowIndex * blockSize)
+            blockPos = fmap (`div` blockSize) pos ^+^ xy colIndex rowIndex
+        fg (Color 1) blockPos
+        draw sprite pixelPos

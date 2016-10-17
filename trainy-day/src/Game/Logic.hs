@@ -12,6 +12,7 @@ import Linear.Vector ((^*), (^/), (^+^))
 data GS = GS
     { _rails :: Rails
     , _trains :: [Train]
+    , _gameStep :: Int
     }
 
 type Rails = Map TrackPos (Either Track Switch)

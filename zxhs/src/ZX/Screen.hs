@@ -54,6 +54,8 @@ screenBlocksWH = fmap (`div` blockSize) logicalScreenSizeWH
 xy :: (Num a) => a -> a -> Point V2 a
 xy x y = P (V2 x y)
 
+-- | A 8x8 binary sprite data.
+-- TODO(robinp): smart ctor should enforce the size restriction.
 newtype Sprite8 = Sprite8 { sprite8Bytes :: SV.Vector Word8 }
 sprite8 = Sprite8 . V.fromList
 
