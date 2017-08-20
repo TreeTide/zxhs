@@ -119,9 +119,12 @@ renderGS gs = do
     renderRails (gs^.rails)
     mapM_ (renderTrain (gs^.gameStep)) (gs^.trains)
 
--- TODO really have to make stuff work transparently with either of
--- xy or block-xy, which should be different types.
+-- TODO tag block or pixel pos in type, provide conversion functions
 xyOfBlock x y = xy (blockSize*x) (blockSize*y)
+pixelToBlock :: Point V2 Int -> Point V2 Int
+pixelToBlock = fmap (`div` blockSize)
+blockToPixel :: Point V2 Int -> Point V2 Int
+blockToPixel = fmap (*blockSize)
 
 blitThing :: Renderer -> Texture -> Int -> IO ()
 blitThing renderer tex t = do
@@ -158,11 +161,15 @@ allFor a = flip runReaderT a . ReaderT
 
 -- TODO should be common utility in ZxHs.
 drawCompound multi pos =
-    traverseMulti multi $ \(Element elemPos sprite) -> do
-        let rowIndex = elemPos^._y
-            colIndex = elemPos^._x
-            -- TODO HACK make it possible to color all affected tiles (considering overlap)
-            pixelPos = pos ^+^ xy (colIndex * blockSize) (rowIndex * blockSize)
-            blockPos = fmap (`div` blockSize) pos ^+^ xy colIndex rowIndex
+    traverseMulti multi $ \(Element elemBlockPos sprite) -> do
+        -- TODO HACK make it possible to color all affected tiles (considering overlap)
+        let pixelPos = pos ^+^ blockToPixel elemBlockPos
+            blockPos = pixelToBlock pos ^+^ elemBlockPos
         fg (Color 1) blockPos
         draw sprite pixelPos
+
+ap1 pos (Element bp _) = fg (Color 1) (pixelToBlock pos ^+^ bp)
+ap2 pos (Element bp s) = draw s (pos ^+^ blockToPixel bp)
+
+draw2 multi pos =
+    traverseMulti multi (\e -> ap1 pos e)
