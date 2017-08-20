@@ -10,6 +10,8 @@ import Control.Monad.Trans.Reader
 import Control.Lens
 import Data.Bool (bool)
 import qualified Data.Map.Strict as M
+import Data.Monoid ((<>))
+import qualified Data.Set as S
 import Data.Word (Word8)
 import Foreign.C.Types (CInt)
 import qualified Foreign.Ptr as F
@@ -104,7 +106,7 @@ renderRails = mapM_ (uncurry renderTrack) . M.toList
 renderTrain :: ZXScreen m => Int -> Train -> m ()
 renderTrain steps t =
     let unitOffset = (round . (*(fromIntegral blockSize))) <$> positionInTile (t^.engine)
-        tileCorner = (blockSize*) <$> (t^.engine.tilePos)
+        tileCorner = blockToPixel (t^.engine.tilePos)
         trainPivot = xy (-8) (-16)  -- TODO manage sprite pivots less manualy
         pos = tileCorner ^+^ unitOffset ^+^ trainPivot
         cloudOffset = xy 8 (-8)
@@ -160,13 +162,27 @@ animate sps tickDiv t =
 allFor a = flip runReaderT a . ReaderT
 
 -- TODO should be common utility in ZxHs.
-drawCompound multi pos =
-    traverseMulti multi $ \(Element elemBlockPos sprite) -> do
+drawCompound multi pos = do
+    traverseMulti multi $ \(Element elemBlockPos sprite) ->
         -- TODO HACK make it possible to color all affected tiles (considering overlap)
         let pixelPos = pos ^+^ blockToPixel elemBlockPos
-            blockPos = pixelToBlock pos ^+^ elemBlockPos
-        fg (Color 1) blockPos
-        draw sprite pixelPos
+        in draw sprite pixelPos
+    -- TODO give choice about coloring the overlapped blocks
+    let originBlock = pixelToBlock pos
+    mapM_ colorize (map (^+^ originBlock) (overlapped multi pos))
+      where
+        colorize block = fg (Color 1) block >> bg (Color 4) block
+
+-- TODO now returns relative blocks not absolute - change or document.
+overlapped multi pos =
+    let blocks = map elemBlockPos (rowMajor multi)
+        P (V2 xOffs yOffs) = fmap (`mod` blockSize) pos
+        hasXOverlap = xOffs /= 0
+        hasYOverlap = yOffs /= 0
+        yOverlaps = if hasYOverlap then map (^+^ xy 0 1) blocks else []
+        xOverlaps = if hasXOverlap then map (^+^ xy 1 0) blocks else []
+        cornerOverlaps = if hasXOverlap && hasYOverlap then map (^+^ xy 1 1) blocks else []
+    in S.toList (S.fromList blocks <> S.fromList yOverlaps <> S.fromList xOverlaps <> S.fromList cornerOverlaps)
 
 ap1 pos (Element bp _) = fg (Color 1) (pixelToBlock pos ^+^ bp)
 ap2 pos (Element bp s) = draw s (pos ^+^ blockToPixel bp)
